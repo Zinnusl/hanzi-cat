@@ -128,6 +128,11 @@ pub fn start_game() -> Result<(), JsValue> {
     cat_container.set_inner_html(CAT_SVG);
     root.append_child(&cat_container)?;
 
+    // Typing overlay (higher z-level above cat, separate from canvas)
+    let typing_div = doc.create_element("div")?;
+    typing_div.set_id("hc-typing");
+    root.append_child(&typing_div)?;
+
     // Resize canvas to window width minus some margin
     let width = win.inner_width()?.as_f64().unwrap_or(800.0) - 40.0;
     let height = win.inner_height()?.as_f64().unwrap_or(600.0) - 120.0; // leave space for header (cat overlays bottom)
@@ -415,15 +420,7 @@ fn tick_and_render(game: &mut Game, now: f64) {
         game.notes.retain(|n| !n.hit);
     }
 
-    // Draw current typing buffer near bottom center
-    if !game.typing.is_empty() {
-        game.ctx.set_fill_style(&JsValue::from_str("#6cf"));
-        game.ctx.set_font("28px 'Fira Code', monospace");
-        game.ctx
-            .fill_text(&game.typing, game.width / 2.0, game.height - 50.0)
-            .ok();
-        game.ctx.set_font("48px 'Noto Serif SC', 'SimSun', serif"); // restore
-    }
+    // Typing buffer now rendered in DOM overlay (#hc-typing) above cat; removed from canvas.
 
     // Update score UI
     if let Some(doc) = window().and_then(|w| w.document()) {
@@ -441,6 +438,9 @@ fn tick_and_render(game: &mut Game, now: f64) {
                 hearts.push_str(&format!("<span class='hc-heart {class}'><svg viewBox='0 0 16 16'><path d='M4 1h2l2 2 2-2h2l3 3v2l-7 8-7-8V4z'/></svg></span>"));
             }
             lives_el.set_inner_html(&hearts);
+        }
+        if let Some(typing_el) = doc.get_element_by_id("hc-typing") {
+            typing_el.set_text_content(Some(if game.typing.is_empty() { "" } else { &game.typing }));
         }
     }
 
@@ -751,7 +751,7 @@ const CAT_SVG: &str = r#"<svg class='hc-cat' viewBox='0 0 200 200' role='img' ar
 </svg>"#;
 
 const BASE_CSS: &str = r#"
-#hanzi-cat-root { font-family: 'Noto Serif SC', 'SimSun', serif; color: #eee; padding: 10px; }
+#hanzi-cat-root { position:relative; font-family: 'Noto Serif SC', 'SimSun', serif; color: #eee; padding: 10px; }
 .hc-header { display:flex; gap:1.5rem; align-items:center; font-size:1.2rem; margin-bottom:8px; }
 .hc-title { font-weight:700; letter-spacing:1px; color:#ffd166; text-shadow:0 0 6px #222; }
 #hc-score, #hc-combo { font-family: 'Fira Code', monospace; }
@@ -794,4 +794,5 @@ body { margin:0; background:linear-gradient(#272a33 0 65%, #1a1c20 65% 100%); ov
 .hc-heart.full svg path { fill:#e02828; stroke:#890000; stroke-width:1; }
 .hc-heart.empty svg path { fill:#2a0000; stroke:#550000; stroke-width:1; }
 .hc-heart svg { width:100%; height:100%; shape-rendering:crispEdges; image-rendering:pixelated; }
+#hc-typing { position:absolute; left:50%; bottom:190px; transform:translateX(-50%); font:28px 'Fira Code', monospace; color:#6cf; text-shadow:0 0 6px #000,0 0 12px rgba(0,0,0,0.6); letter-spacing:1px; pointer-events:none; z-index:10; }
 "#;

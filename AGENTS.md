@@ -107,6 +107,7 @@ Agents may append items here with justification:
 - Hanzi outline contrast: Added consistent black stroke outline for all falling notes (except red danger outline in claw zone) to improve readability against sushi bases.
 - GitHub Pages CI: Introduced gh-pages.yml workflow building via wasm-pack (target web, release) and deploying index.html + pkg/ to GitHub Pages.
 - CI fix: Replaced ad-hoc curl pipe install of wasm-pack with jetli/wasm-pack-action@v0.4.0 for reliable installation on GitHub-hosted runners.
+- Typed text overlay: Moved in-progress pinyin typing buffer from being drawn on the canvas beneath the cat to a dedicated absolutely positioned DOM element (#hc-typing) layered above the cat for higher visibility; removed old canvas draw block and added CSS with z-index.
 
 ---
 This document is a living reference for agents. Update responsibly and keep it tightly aligned with actual repository state.
