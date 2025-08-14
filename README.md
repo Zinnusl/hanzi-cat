@@ -10,8 +10,9 @@ A tiny Rust → WebAssembly rhythm / reaction & typing game to help you practice
 - When a note nears the cat's claws it gains a red danger outline; claws may strike with a red slash effect when notes are in the danger zone.
 - A variety of sushi bases render beneath each falling Hanzi for visual flair and separation.
 - The in‑progress typing buffer appears in a dedicated overlay element for visibility.
-- NEW: An Instructions button (top‑left) opens an accessible overlay with controls & tips.
+- NEW: An Instructions button (top‑right) opens an accessible overlay with controls & tips.
 - Subtle keypress sound effects: reactive oscillator tones for letters, tone numbers, enter, and backspace (skips while instructions overlay is open; no external audio assets for minimal size).
+- Constant minimalist synth beat (kick / snare / hi-hat) loops at ~120 BPM after your first key or pointer input; it auto-mutes while the Instructions overlay is open (procedural Web Audio, no assets).
 
 ## Controls
 | Action | Key(s) |
@@ -21,10 +22,10 @@ A tiny Rust → WebAssembly rhythm / reaction & typing game to help you practice
 | Submit | `Enter` |
 | Edit buffer | `Backspace` |
 | Close instructions overlay | `Esc` or click Close |
-| Open instructions overlay | Click "Instructions" button (top‑left) |
+| Open instructions overlay | Click "Instructions" button (top‑right) |
 
 ## Instructions Overlay
-Click the "Instructions" button in the top‑left at any time to view gameplay help. The overlay:
+Click the "Instructions" button in the top‑right at any time to view gameplay help. The overlay:
 - Is marked with `role="dialog"` and toggles `aria-hidden` for accessibility.
 - Traps focus rudimentarily while open.
 - Can be closed with the Close button or the `Escape` key.
