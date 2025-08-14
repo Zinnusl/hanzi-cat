@@ -10,9 +10,21 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet" />
   <style>
-    body { font-family: 'Noto Serif SC', 'SimSun', serif; background:#111; color:#eee; }
+    body { font-family: 'Noto Serif SC', 'SimSun', serif; background:#111; color:#eee; margin:0; }
     .loading { padding:28px; text-align:center; font-size:1.1rem; opacity:0.85; }
-    a.github { position:fixed; top:8px; right:12px; color:#ffd166; text-decoration:none; font-family:'Fira Code', monospace; }
+    a.github { position:fixed; top:8px; right:12px; color:#ffd166; text-decoration:none; font-family:'Fira Code', monospace; z-index:40; }
+    button#hc-instructions-btn { position:fixed; top:8px; left:12px; z-index:40; background:#222; color:#ffd166; border:1px solid #444; padding:6px 10px; font-family:'Fira Code', monospace; font-size:0.85rem; cursor:pointer; border-radius:4px; box-shadow:0 0 0 1px #000 inset; }
+    button#hc-instructions-btn:hover { background:#2c2c2c; }
+    #hc-instructions-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.84); color:#eee; z-index:50; display:none; overflow:auto; font-family:'Fira Code', monospace; }
+    #hc-instructions-overlay[aria-hidden="false"] { display:block; }
+    #hc-instructions-overlay .panel { max-width:780px; margin:70px auto 120px; background:#181818; padding:28px 34px 40px; border:1px solid #333; border-radius:10px; box-shadow:0 4px 22px -4px #000; line-height:1.4; }
+    #hc-instructions-overlay h1 { margin-top:0; font-size:1.6rem; font-family:'Noto Serif SC', serif; }
+    #hc-instructions-overlay h2 { margin:1.6em 0 0.5em; font-size:1.05rem; text-transform:uppercase; letter-spacing:1px; font-weight:600; }
+    #hc-instructions-overlay p, #hc-instructions-overlay li { font-size:0.9rem; }
+    #hc-instructions-overlay code { background:#222; padding:2px 5px; border-radius:4px; font-size:0.85rem; }
+    #hc-instructions-overlay button.close { position:absolute; top:10px; right:14px; background:#222; color:#ffd166; border:1px solid #444; padding:4px 10px; cursor:pointer; border-radius:4px; font-family:'Fira Code', monospace; }
+    #hc-instructions-overlay button.close:hover { background:#2c2c2c; }
+    #hc-instructions-overlay a { color:#8ab4ff; }
   </style>
 </head>
 <body>
