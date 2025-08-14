@@ -3,19 +3,16 @@
 A tiny Rust → WebAssembly rhythm / reaction & typing game to help you practice Hanzi recognition and pinyin + tone input. Built with size minimization in mind (aggressively optimized release profile and pruned `web-sys` features).
 
 ## Gameplay Snapshot
-- Hanzi (and occasional multi‑character words) fall toward an animated cat at the bottom.
-- Type the pinyin syllable (letters only, no tones marks; use `v` for ü) followed by the tone number `1–5`, then press `Enter`.
-- Correct submissions score and advance your combo (combo advances even if timing is a little off; fine timing scoring may evolve later).
-- Three pixel hearts = your lives. Misses / incorrect submissions can remove a heart and break combo.
-- When a note nears the cat's claws it gains a red danger outline; claws may strike with a red slash effect when notes are in the danger zone.
-- A variety of sushi bases render beneath each falling Hanzi for visual flair and separation.
-- The in‑progress typing buffer appears in a dedicated overlay element for visibility.
-- NEW: An Instructions button (top‑right) opens an accessible overlay with controls & tips.
-- Subtle keypress sound effects: reactive oscillator tones for letters, tone numbers, enter, and backspace (skips while instructions overlay is open; no external audio assets for minimal size).
-- Constant minimalist synth beat (kick / snare / hi-hat) loops at ~120 BPM after your first key or pointer input; interactive keystroke modulation adds brief accent swells (plus micro hat blips on letters) and it auto-mutes while the Instructions overlay is open (procedural Web Audio, no assets).
-- Dynamic difficulty ramp over ~3 minutes: spawn interval shrinks (faster notes), fall speed increases, and probability of multi-character words rises for a gentle early on‑ramp that escalates into a denser challenge.
-- Powerups (x2 Score, Slow Time, Shield): spend accumulated score (1200 / 800 / 600) to temporarily double points, slow falling speed & ease spawn pressure, or absorb the next miss (shield stores up to 3 charges). Simple left-side panel with live affordance (buttons disable if you lack score).
-- Expanded Hanzi / word dataset: many more single characters (directions, body parts, nature, basics) and common words (中国, 天气, 老师, 朋友, 手机, 电脑, 米饭, 语言, etc.) for increased variety during play.
+(Transition phase: classic falling-note mode has been removed. A new board-based rhythmic prototype is now the default. Typing + scoring systems are being re-integrated.)
+- Board-based prototype: Hanzi pieces (starting with "你") spawn at defined points and hop tile-to-tile each beat across an 8×8 grid toward goal tiles.
+- Beat-synchronized hop animation with a simple parabolic lift for visual clarity.
+- Obstacles demo: blocks (impassable), teleport, conveyors (auto-push), tempo shift (temporary faster hop timing), and a transform tile that can swap one Hanzi to another (e.g., 你→好) to preview upcoming character transformation mechanics.
+- Automatic spawning every 4 beats (soft cap of 5 concurrent pieces in current prototype) with greedy Manhattan pathing toward any goal tile.
+- Reaching a goal awards placeholder score; combo, lives, and powerups have been removed pending redesigned progression & challenge curves.
+- Datasets of single and multi-character Hanzi + pinyin retained for upcoming typing reattachment (typing input not yet hooked into board logic; keystroke audio feedback still functions).
+- Instructions overlay (top-right) remains for quick reference and will evolve to include board-specific controls and mechanics as they mature.
+- Minimalist procedural beat & keystroke sound effects still active (audio context unlocked on first input) for rhythmic context.
+- Expanded Hanzi / word dataset preserved (directions, body parts, nature, basics, common words) for future spawning variety once selection logic is integrated with board mode.
 
 ## Controls
 | Action | Key(s) |
