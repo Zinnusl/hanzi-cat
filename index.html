@@ -29,6 +29,25 @@
 </head>
 <body>
   <a class="github" href="https://github.com/Zinnusl/hanzi-cat" target="_blank" rel="noopener">repo</a>
+  <button id="hc-instructions-btn" type="button" aria-haspopup="dialog" aria-controls="hc-instructions-overlay">Instructions</button>
+  <div id="hc-instructions-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="hc-instructions-title">
+    <div class="panel" tabindex="-1">
+      <button class="close" type="button" aria-label="Close instructions">&times;</button>
+      <h1 id="hc-instructions-title">Hanzi Cat Instructions</h1>
+      <p>Type the pinyin (letters then tone number 1-5) for each falling Hanzi before it reaches the cat's claws. Press Enter to submit. Backspace to correct.</p>
+      <h2>Controls</h2>
+      <ul>
+        <li>Letters a-z: build pinyin syllable</li>
+        <li>Digits 1-5: add tone number</li>
+        <li>Enter: submit current input</li>
+        <li>Backspace: delete last character</li>
+        <li>Esc: close this dialog</li>
+      </ul>
+      <h2>Scoring & Lives</h2>
+      <p>Maintain combos by entering correct pinyin (timing leniency allowed). You have three lives (hearts). Missing a note or wrong submission costs a life.</p>
+      <p><em>Close this panel to resume audio key feedback.</em></p>
+    </div>
+  </div>
   <noscript>You need JavaScript enabled to play Hanzi Cat.</noscript>
   <div id="boot" class="loading">Loading Hanzi Cat WASM...</div>
   <!-- Root is created automatically by start_game(), but we can also pre-create -->
@@ -58,6 +77,52 @@
       }
     }
     main();
+
+    // Instructions overlay show/hide + basic focus management
+    const instrBtn = document.getElementById('hc-instructions-btn');
+    const instrOverlay = document.getElementById('hc-instructions-overlay');
+    const instrPanel = instrOverlay ? instrOverlay.querySelector('.panel') : null;
+    const instrClose = instrOverlay ? instrOverlay.querySelector('button.close') : null;
+    let lastFocusedBeforeInstr = null;
+
+    function openInstructions() {
+      if (!instrOverlay) return;
+      lastFocusedBeforeInstr = document.activeElement;
+      instrOverlay.setAttribute('aria-hidden', 'false');
+      // Delay focus to ensure visibility
+      setTimeout(() => { if (instrPanel) instrPanel.focus(); }, 0);
+    }
+    function closeInstructions() {
+      if (!instrOverlay) return;
+      instrOverlay.setAttribute('aria-hidden', 'true');
+      if (lastFocusedBeforeInstr && typeof lastFocusedBeforeInstr.focus === 'function') {
+        lastFocusedBeforeInstr.focus();
+      } else if (instrBtn) {
+        instrBtn.focus();
+      }
+    }
+    if (instrBtn && instrOverlay && instrClose) {
+      instrBtn.addEventListener('click', openInstructions);
+      instrClose.addEventListener('click', closeInstructions);
+      instrOverlay.addEventListener('click', (e) => {
+        if (e.target === instrOverlay) closeInstructions();
+      });
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && instrOverlay.getAttribute('aria-hidden') === 'false') {
+          closeInstructions();
+        }
+        // rudimentary focus trap
+        if (e.key === 'Tab' && instrOverlay.getAttribute('aria-hidden') === 'false') {
+          const focusables = instrOverlay.querySelectorAll('button, [href], [tabindex]:not([tabindex="-1"])');
+            if (focusables.length) {
+              const first = focusables[0];
+              const last = focusables[focusables.length - 1];
+              if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+              else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+            }
+        }
+      });
+    }
 
     // Lightweight reactive keypress sound effects (no external assets, minimal size)
     // Uses Web Audio API oscillators with short envelopes to provide subtle feedback.
