@@ -114,6 +114,7 @@ Agents may append items here with justification:
 - Instructions button visibility fix: Restored missing Instructions button markup, dialog overlay structure, and JS toggle/focus logic in index.html so the previously documented feature is actually present and accessible.
 - Constant synth beat: Added minimalist procedural kick/snare/hi-hat loop (~120 BPM) starting on first user key or pointer input (unlocked AudioContext), auto-muting while the Instructions overlay is open; updated README and index.html to mention it.
 - Instructions button reposition: Moved Instructions button from top-left to top-right beside repo link; updated CSS positioning and README references.
+- Interactive beat modulation: Enhanced constant synth beat with keystroke-driven gain swells and optional micro hi-hat blips on letter keys; updated README feature bullet and extended hcAudio with modulate() API.
 
 ---
 This document is a living reference for agents. Update responsibly and keep it tightly aligned with actual repository state.

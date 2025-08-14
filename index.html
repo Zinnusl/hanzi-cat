@@ -226,7 +226,33 @@
         osc.stop(now + 0.25);
       }
 
-      return { play, startBeatLoop, setBeatMuted };
+      // Keystroke-driven modulation: brief accent gain + optional extra hat blip
+      function modulate(kind) {
+        const c = ensureCtx();
+        if (!c) return;
+        if (!beatGain) {
+          beatGain = c.createGain();
+          beatGain.gain.value = 0.5;
+          beatGain.connect(c.destination);
+        }
+        const now = c.currentTime;
+        const base = 0.5;
+        let boost = 0.15;
+        if (kind === 'enter') boost = 0.28;
+        else if (kind === 'backspace') boost = 0.20;
+        else if (kind === 'tone') boost = 0.18;
+        // Apply quick gain swell without affecting future scheduled percs amplitude baseline
+        beatGain.gain.cancelScheduledValues(now);
+        beatGain.gain.setValueAtTime(beatGain.gain.value, now);
+        beatGain.gain.linearRampToValueAtTime((beatMuted ? 0 : base + boost), now + 0.04);
+        beatGain.gain.linearRampToValueAtTime((beatMuted ? 0 : base), now + 0.22);
+        // Optional extra high-hat micro blip for letters only to feel reactive
+        if (kind === 'letter') {
+          makePerc({ type: 'square', freq: 6500 + Math.random()*800, dur: 0.04, decay: 0.05, gain: 0.10 });
+        }
+      }
+
+      return { play, startBeatLoop, setBeatMuted, modulate };
     })();
     window._hcAudioRef = hcAudio; // expose for instructions overlay mute control
 
@@ -237,10 +263,15 @@
       if (instr && instr.getAttribute('aria-hidden') === 'false') return;
       // Start background beat loop on first user interaction
       hcAudio.startBeatLoop();
-      if (e.key === 'Enter') hcAudio.play('enter');
-      else if (e.key === 'Backspace') hcAudio.play('backspace');
-      else if (/^[1-5]$/.test(e.key)) hcAudio.play('tone');
-      else if (/^[a-zA-Z]$/.test(e.key)) hcAudio.play('letter');
+      let kind = null;
+      if (e.key === 'Enter') kind = 'enter';
+      else if (e.key === 'Backspace') kind = 'backspace';
+      else if (/^[1-5]$/.test(e.key)) kind = 'tone';
+      else if (/^[a-zA-Z]$/.test(e.key)) kind = 'letter';
+      if (kind) {
+        hcAudio.play(kind);
+        hcAudio.modulate(kind);
+      }
     });
 
     // Also start beat on first pointer/touch interaction (in case of mobile users who tap first)
