@@ -13,6 +13,7 @@ A tiny Rust → WebAssembly rhythm / reaction & typing game to help you practice
 - NEW: An Instructions button (top‑right) opens an accessible overlay with controls & tips.
 - Subtle keypress sound effects: reactive oscillator tones for letters, tone numbers, enter, and backspace (skips while instructions overlay is open; no external audio assets for minimal size).
 - Constant minimalist synth beat (kick / snare / hi-hat) loops at ~120 BPM after your first key or pointer input; interactive keystroke modulation adds brief accent swells (plus micro hat blips on letters) and it auto-mutes while the Instructions overlay is open (procedural Web Audio, no assets).
+- Dynamic difficulty ramp over ~3 minutes: spawn interval shrinks (faster notes), fall speed increases, and probability of multi-character words rises for a gentle early on‑ramp that escalates into a denser challenge.
 
 ## Controls
 | Action | Key(s) |

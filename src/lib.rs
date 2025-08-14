@@ -51,6 +51,8 @@ struct Game {
     cat_drawn: bool,
     lives: i32,
     game_over: bool,
+    // 0.0 -> 1.0 progression for dynamic difficulty scaling over a session
+    difficulty_progress: f64,
 }
 
 thread_local! {
@@ -85,6 +87,40 @@ const HANZI_LIST: &[(&str, &str)] = &[
 
 // Feature/config toggles
 const SHOW_SUSHI: bool = true; // Set to false to disable sushi base rendering for performance tests
+
+// Difficulty ramp configuration (session length targeted ~3 minutes)
+const DIFFICULTY_TOTAL_MS: f64 = 180_000.0; // time to reach max difficulty
+const INITIAL_SPAWN_INTERVAL_MS: f64 = 1400.0;
+const FINAL_SPAWN_INTERVAL_MS: f64 = 550.0;
+const INITIAL_SPEED_PX_PER_MS: f64 = 0.18;
+const FINAL_SPEED_PX_PER_MS: f64 = 0.34;
+const MULTI_CHAR_INITIAL: f64 = 0.12; // starting probability of spawning a multi-character word
+const MULTI_CHAR_FINAL: f64 = 0.55;   // final probability at max difficulty
+
+// Separate slices for single vs multi-character notes (referencing same static data)
+const SINGLE_HANZI: &[(&str, &str)] = &[
+    ("你", "ni3"),
+    ("好", "hao3"),
+    ("猫", "mao1"),
+    ("学", "xue2"),
+    ("汉", "han4"),
+    ("字", "zi4"),
+    ("黑", "hei1"),
+    ("鱼", "yu2"),
+    ("火", "huo3"),
+    ("山", "shan1"),
+    ("水", "shui3"),
+    ("月", "yue4"),
+];
+const MULTI_HANZI: &[(&str, &str)] = &[
+    ("你好", "ni3hao3"),
+    ("汉字", "han4zi4"),
+    ("黑猫", "hei1mao1"),
+    ("学习", "xue2xi2"),
+    ("火山", "huo3shan1"),
+    ("山水", "shan1shui3"),
+    ("月鱼", "yue4yu2"),
+];
 
 #[wasm_bindgen]
 pub fn start_game() -> Result<(), JsValue> {
@@ -156,14 +192,15 @@ pub fn start_game() -> Result<(), JsValue> {
         score: 0,
         combo: 0,
         last_spawn_ms: now,
-        spawn_interval_ms: 1400.0,
-        speed_px_per_ms: 0.18, // pixels per ms (~180 px/s)
+        spawn_interval_ms: INITIAL_SPAWN_INTERVAL_MS,
+        speed_px_per_ms: INITIAL_SPEED_PX_PER_MS, // pixels per ms
         width,
         height,
         started_ms: now,
         cat_drawn: false,
         lives: 3,
         game_over: false,
+        difficulty_progress: 0.0,
     };
 
     GAME.with(|g| *g.borrow_mut() = Some(game));
@@ -288,9 +325,12 @@ fn start_animation_loop() {
 }
 
 fn tick_and_render(game: &mut Game, now: f64) {
+    // Update dynamic difficulty parameters
+    update_difficulty(game, now);
+
     // Spawn new note (unless game over)
     if !game.game_over && now - game.last_spawn_ms >= game.spawn_interval_ms {
-        let (h, p) = HANZI_LIST[rand_index(HANZI_LIST.len())];
+        let (h, p) = choose_note(game.difficulty_progress);
         game.notes.push(Note {
             hanzi: h,
             pinyin: p,
@@ -678,6 +718,36 @@ fn rand_index(len: usize) -> usize {
     }
     let now = performance_now();
     (now as usize).wrapping_mul(1103515245).wrapping_add(12345) % len
+}
+
+// Pseudo random unit value in [0,1)
+fn rand_unit() -> f64 {
+    let now = performance_now();
+    // Simple LCG style transformation then normalize
+    let v = ((now as u64).wrapping_mul(6364136223846793005).wrapping_add(1) >> 17) as u64;
+    (v % 1_000_000) as f64 / 1_000_000.0
+}
+
+fn lerp(a: f64, b: f64, t: f64) -> f64 { a + (b - a) * t }
+
+// Update difficulty based on elapsed time; linear scaling for now (simple & predictable)
+fn update_difficulty(game: &mut Game, now: f64) {
+    let elapsed = now - game.started_ms;
+    let progress = (elapsed / DIFFICULTY_TOTAL_MS).clamp(0.0, 1.0);
+    game.difficulty_progress = progress;
+    game.spawn_interval_ms = lerp(INITIAL_SPAWN_INTERVAL_MS, FINAL_SPAWN_INTERVAL_MS, progress);
+    game.speed_px_per_ms = lerp(INITIAL_SPEED_PX_PER_MS, FINAL_SPEED_PX_PER_MS, progress);
+}
+
+// Choose note respecting probability of multi-character entries as difficulty rises.
+fn choose_note(progress: f64) -> (&'static str, &'static str) {
+    let multi_prob = lerp(MULTI_CHAR_INITIAL, MULTI_CHAR_FINAL, progress);
+    if rand_unit() < multi_prob && !MULTI_HANZI.is_empty() {
+        MULTI_HANZI[rand_index(MULTI_HANZI.len())]
+    } else {
+        // fallback to single if empty or probability branch fails
+        SINGLE_HANZI[rand_index(SINGLE_HANZI.len())]
+    }
 }
 
 // Inject base style only once.
