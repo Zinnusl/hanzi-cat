@@ -60,6 +60,7 @@ Agents MUST follow these steps for every task:
 6. Validation: (When test/build scripts become available) run them prior to completion. If absent, note the omission explicitly.
 7. Documentation Sync: If process, features, or build commands change, update both `README.md` (user perspective) and `AGENTS.md` (agent perspective).
 8. Completion: Only call `attempt_completion` after confirming prior tool operations succeeded.
+9. Don't run start command
 
 ## 9. Editing Guidelines
 - Keep comments concise, English only.
