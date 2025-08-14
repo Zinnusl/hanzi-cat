@@ -1,0 +1,58 @@
+[package]
+name = "hanzi-cat"
+version = "0.1.0"
+edition = "2024"
+authors = ["Hanzi Cat Team <example@example.com>"]
+description = "Hanzi Cat WASM rhythm / typing game to learn Hanzi pronunciation"
+license = "MIT OR Apache-2.0"
+repository = "https://example.com/hanzi-cat"
+readme = "README.md"
+keywords = ["wasm", "game", "learning", "pinyin", "hanzi"]
+categories = ["education", "game-engines", "wasm"]
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+path = "src/lib.rs"
+
+[features]
+# Default feature enables improved panic messages in browser console for debugging.
+default = ["console_error_panic_hook"]
+# Individual feature toggles (gate optional deps to keep wasm small when unused):
+console_error_panic_hook = ["dep:console_error_panic_hook"]
+wee_alloc = ["dep:wee_alloc"]
+serde = ["dep:serde"]
+serde_json = ["serde", "dep:serde_json"]
+# RNG (browser) support if future gameplay needs randomness.
+rng = ["dep:getrandom"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = [
+    "Window",
+    "Document",
+    "HtmlCanvasElement",
+    "CanvasRenderingContext2d",
+    "Performance",
+    "KeyboardEvent",
+    "HtmlElement",
+    "EventTarget"
+] }
+console_error_panic_hook = { version = "0.1", optional = true }
+wee_alloc = { version = "0.4", optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
+getrandom = { version = "0.2", features = ["js"], optional = true }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[profile.release]
+opt-level = "z"
+panic = "abort"
+lto = true
+codegen-units = 1
+strip = true
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-Oz", "--enable-mutable-globals"]
+

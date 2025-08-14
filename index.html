@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hanzi Cat</title>
+  <meta name="description" content="Hanzi Cat – WASM rhythm / typing game to learn Hanzi pronunciation" />
+  <!-- Optional web fonts (can be removed to save requests) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Noto Serif SC', 'SimSun', serif; background:#111; color:#eee; }
+    .loading { padding:28px; text-align:center; font-size:1.1rem; opacity:0.85; }
+    a.github { position:fixed; top:8px; right:12px; color:#ffd166; text-decoration:none; font-family:'Fira Code', monospace; }
+  </style>
+</head>
+<body>
+  <a class="github" href="https://example.com/hanzi-cat" target="_blank" rel="noopener">repo</a>
+  <noscript>You need JavaScript enabled to play Hanzi Cat.</noscript>
+  <div id="boot" class="loading">Loading Hanzi Cat WASM...</div>
+  <!-- Root is created automatically by start_game(), but we can also pre-create -->
+  <div id="hanzi-cat-root"></div>
+
+  <script type="module">
+    // Entry module for the game.
+    // Build instructions:
+    // 1. Install wasm-pack if not present: cargo install wasm-pack
+    // 2. Build: wasm-pack build --target web --release
+    // 3. Serve this directory with a static file server (python -m http.server, simple-http-server, etc.)
+    // 4. Open index.html in a browser (must be served over http(s) for proper wasm MIME in some browsers).
+
+    import init, { start_game } from './pkg/hanzi_cat.js'; // wasm-bindgen JS glue (pkg/ created by wasm-pack)
+
+    async function main() {
+      try {
+        await init(); // this fetches & instantiates hanzi_cat_bg.wasm
+        start_game();
+        const boot = document.getElementById('boot');
+        if (boot) boot.remove();
+      } catch (err) {
+        console.error('Failed to load Hanzi Cat WASM:', err);
+        const boot = document.getElementById('boot');
+        if (boot) boot.textContent = 'Failed to load WASM module. See console.';
+      }
+    }
+    main();
+  </script>
+
+  <!-- Alternative manual loader (if not using wasm-pack) - comment kept for reference:
+  <script type="module">
+    // If you built with: cargo build --target wasm32-unknown-unknown --release
+    // You can manually instantiate the raw .wasm (no wasm-bindgen shims) but then you must expose and call exported funcs differently.
+    // Prefer wasm-pack for proper JS bindings; leaving this note to document alternative.
+  </script>
+  -->
+</body>
+</html>
+
