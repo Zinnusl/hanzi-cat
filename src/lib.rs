@@ -53,6 +53,13 @@ struct Game {
     game_over: bool,
     // 0.0 -> 1.0 progression for dynamic difficulty scaling over a session
     difficulty_progress: f64,
+    // Active score multiplier (1.0 when none active)
+    score_multiplier: f64,
+    multiplier_ends_ms: f64,
+    // Slow time (reduces speed & spawn rate inflation)
+    slow_time_ends_ms: f64,
+    // Shield prevents next life loss
+    shield_charges: i32,
 }
 
 thread_local! {
@@ -96,6 +103,15 @@ const INITIAL_SPEED_PX_PER_MS: f64 = 0.18;
 const FINAL_SPEED_PX_PER_MS: f64 = 0.34;
 const MULTI_CHAR_INITIAL: f64 = 0.12; // starting probability of spawning a multi-character word
 const MULTI_CHAR_FINAL: f64 = 0.55;   // final probability at max difficulty
+
+// Powerup configuration
+const COST_SLOW_TIME: i32 = 800; // cost in score points
+const COST_MULTIPLIER: i32 = 1200;
+const COST_SHIELD: i32 = 600;
+const DURATION_SLOW_TIME_MS: f64 = 8_000.0;
+const DURATION_MULTIPLIER_MS: f64 = 10_000.0;
+const SLOW_TIME_SPEED_FACTOR: f64 = 0.55; // multiply fall speed by this when active
+const SLOW_TIME_SPAWN_FACTOR: f64 = 1.25; // extend spawn interval (slightly fewer spawns)
 
 // Separate slices for single vs multi-character notes (referencing same static data)
 const SINGLE_HANZI: &[(&str, &str)] = &[
@@ -201,6 +217,10 @@ pub fn start_game() -> Result<(), JsValue> {
         lives: 3,
         game_over: false,
         difficulty_progress: 0.0,
+        score_multiplier: 1.0,
+        multiplier_ends_ms: 0.0,
+        slow_time_ends_ms: 0.0,
+        shield_charges: 0,
     };
 
     GAME.with(|g| *g.borrow_mut() = Some(game));
@@ -279,13 +299,15 @@ fn handle_key(evt: KeyboardEvent) {
                 let judge_line = game.height - 100.0; // Where to aim
                 if y >= judge_line - 60.0 && y <= judge_line + 40.0 {
                     // Success
-                    game.score += 100 + (game.combo * 10);
+                    let base = 100 + (game.combo * 10);
+                    game.score += (base as f64 * game.score_multiplier) as i32;
                     game.combo += 1;
                     remove_note = true;
                 } else {
                     // Correct but outside ideal timing window: smaller reward, still keep/increase combo
                     // We still advance combo so players are rewarded for accuracy even if timing is off.
-                    game.score += 50 + (game.combo * 5);
+                    let base = 50 + (game.combo * 5);
+                    game.score += (base as f64 * game.score_multiplier) as i32;
                     game.combo += 1;
                     remove_note = true;
                 }
@@ -341,6 +363,21 @@ fn tick_and_render(game: &mut Game, now: f64) {
         game.last_spawn_ms = now;
     }
 
+    // Expire powerups
+    if game.multiplier_ends_ms > 0.0 && now >= game.multiplier_ends_ms {
+        game.score_multiplier = 1.0;
+        game.multiplier_ends_ms = 0.0;
+    }
+    if game.slow_time_ends_ms > 0.0 && now >= game.slow_time_ends_ms {
+        game.slow_time_ends_ms = 0.0;
+    }
+
+    // Apply slow-time adjustments (post difficulty scaling)
+    if game.slow_time_ends_ms > 0.0 {
+        game.speed_px_per_ms *= SLOW_TIME_SPEED_FACTOR;
+        game.spawn_interval_ms *= SLOW_TIME_SPAWN_FACTOR;
+    }
+
     // Clear
     game.ctx.set_fill_style(&JsValue::from_str("#111"));
     game.ctx.fill_rect(0.0, 0.0, game.width, game.height);
@@ -368,7 +405,10 @@ fn tick_and_render(game: &mut Game, now: f64) {
             // Missed
             note.hit = true; // mark for removal
             game.combo = 0;
-            if game.lives > 0 {
+            if game.shield_charges > 0 {
+                // Consume shield instead of losing a life
+                game.shield_charges -= 1;
+            } else if game.lives > 0 {
                 game.lives -= 1;
             }
             if game.lives <= 0 {
@@ -748,6 +788,43 @@ fn choose_note(progress: f64) -> (&'static str, &'static str) {
         // fallback to single if empty or probability branch fails
         SINGLE_HANZI[rand_index(SINGLE_HANZI.len())]
     }
+}
+
+#[wasm_bindgen]
+pub fn purchase_powerup(kind: &str) -> bool {
+    let now = performance_now();
+    let mut success = false;
+    GAME.with(|g| {
+        if let Some(game) = g.borrow_mut().as_mut() {
+            if game.game_over { return; }
+            match kind {
+                "slow" => {
+                    if game.score >= COST_SLOW_TIME {
+                        game.score -= COST_SLOW_TIME;
+                        game.slow_time_ends_ms = now + DURATION_SLOW_TIME_MS;
+                        success = true;
+                    }
+                }
+                "mult" => {
+                    if game.score >= COST_MULTIPLIER {
+                        game.score -= COST_MULTIPLIER;
+                        game.score_multiplier = 2.0;
+                        game.multiplier_ends_ms = now + DURATION_MULTIPLIER_MS;
+                        success = true;
+                    }
+                }
+                "shield" => {
+                    if game.score >= COST_SHIELD && game.shield_charges < 3 {
+                        game.score -= COST_SHIELD;
+                        game.shield_charges += 1;
+                        success = true;
+                    }
+                }
+                _ => {}
+            }
+        }
+    });
+    success
 }
 
 // Inject base style only once.

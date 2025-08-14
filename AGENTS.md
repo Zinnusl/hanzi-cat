@@ -116,6 +116,7 @@ Agents may append items here with justification:
 - Instructions button reposition: Moved Instructions button from top-left to top-right beside repo link; updated CSS positioning and README references.
 - Interactive beat modulation: Enhanced constant synth beat with keystroke-driven gain swells and optional micro hi-hat blips on letter keys; updated README feature bullet and extended hcAudio with modulate() API.
 - Dynamic difficulty ramp: Added linear time-based scaling (~3 min) reducing spawn interval (1400ms → 550ms), increasing fall speed (0.18 → 0.34 px/ms), and raising multi-character word probability (12% → 55%); introduced constants (INITIAL_/FINAL_*, MULTI_CHAR_*), update_difficulty(), choose_note(), and probability-driven multi-character selection; updated README.
+- Powerups system: Introduced purchasable powerups (x2 score multiplier, slow time, shield) with costs (1200/800/600), durations (mult 10s, slow 8s), effects (score_multiplier, speed & spawn interval scaling, shield_charges), purchase_powerup(kind) exported via wasm_bindgen, left-side UI panel (#hc-powerups) with buttons & dynamic enabling based on score, README updated.
 
 ---
 This document is a living reference for agents. Update responsibly and keep it tightly aligned with actual repository state.

@@ -25,6 +25,13 @@
     #hc-instructions-overlay button.close { position:absolute; top:10px; right:14px; background:#222; color:#ffd166; border:1px solid #444; padding:4px 10px; cursor:pointer; border-radius:4px; font-family:'Fira Code', monospace; }
     #hc-instructions-overlay button.close:hover { background:#2c2c2c; }
     #hc-instructions-overlay a { color:#8ab4ff; }
+    /* Powerups panel */
+    .hc-powerups { position:fixed; top:56px; left:12px; z-index:35; background:rgba(0,0,0,0.55); backdrop-filter:blur(4px); border:1px solid #333; padding:8px 10px 10px; border-radius:8px; width:170px; font-family:'Fira Code', monospace; box-shadow:0 4px 14px -4px #000; }
+    .hc-powerups h2 { margin:0 0 6px; font-size:0.8rem; letter-spacing:1px; text-transform:uppercase; font-weight:600; color:#ffd166; }
+    .hc-powerups button { display:block; width:100%; margin:4px 0; background:#222; color:#ddd; border:1px solid #444; padding:4px 6px; font-size:0.7rem; cursor:pointer; border-radius:4px; text-align:left; line-height:1.2; }
+    .hc-powerups button:hover { background:#2b2b2b; }
+    .hc-powerups button:disabled { opacity:0.35; cursor:not-allowed; }
+    .hc-powerups .status { margin-top:6px; font-size:0.65rem; min-height:1.1rem; color:#8ab4ff; }
   </style>
 </head>
 <body>
@@ -52,6 +59,13 @@
   <div id="boot" class="loading">Loading Hanzi Cat WASM...</div>
   <!-- Root is created automatically by start_game(), but we can also pre-create -->
   <div id="hanzi-cat-root"></div>
+  <div id="hc-powerups" class="hc-powerups" aria-label="Powerups">
+    <h2>Powerups</h2>
+    <button type="button" data-kind="mult" title="Double score for 10s (cost 1200)">x2 Score (1200)</button>
+    <button type="button" data-kind="slow" title="Slow time 8s (cost 800)">Slow Time (800)</button>
+    <button type="button" data-kind="shield" title="Prevent next miss (cost 600)">Shield (600)</button>
+    <div class="status" id="hc-powerups-status">none active</div>
+  </div>
 
   <script type="module">
     // Entry module for the game.
@@ -61,7 +75,7 @@
     // 3. Serve this directory with a static file server (python -m http.server, simple-http-server, etc.)
     // 4. Open index.html in a browser (must be served over http(s) for proper wasm MIME in some browsers).
 
-    import init, { start_game } from './pkg/hanzi_cat.js'; // wasm-bindgen JS glue (pkg/ created by wasm-pack)
+    import init, { start_game, purchase_powerup } from './pkg/hanzi_cat.js'; // wasm-bindgen JS glue (pkg/ created by wasm-pack)
 
     async function main() {
       try {
@@ -77,6 +91,46 @@
       }
     }
     main();
+
+    // Powerups UI interactions
+    const puRoot = document.getElementById('hc-powerups');
+    const puStatus = document.getElementById('hc-powerups-status');
+    if (puRoot) {
+      puRoot.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-kind]');
+        if (!btn) return;
+        const kind = btn.getAttribute('data-kind');
+        try {
+          const ok = purchase_powerup(kind);
+          if (!ok) {
+            // brief flash to indicate failure
+            btn.style.outline = '2px solid #ff4d4d';
+            setTimeout(() => { btn.style.outline = ''; }, 280);
+          } else {
+            btn.style.outline = '2px solid #4dff8a';
+            setTimeout(() => { btn.style.outline = ''; }, 300);
+          }
+        } catch (err) {
+          console.warn('purchase_powerup failed', err);
+        }
+      });
+    }
+
+    // Optional periodic enable/disable based on score (lightweight polling)
+    setInterval(() => {
+      const scoreEl = document.getElementById('hc-score');
+      if (!scoreEl) return;
+      const txt = scoreEl.textContent || '';
+      const m = txt.match(/(\d+)/);
+      if (!m) return;
+      const score = parseInt(m[1], 10) || 0;
+      document.querySelectorAll('#hc-powerups button[data-kind]').forEach(btn => {
+        const kind = btn.getAttribute('data-kind');
+        let cost = 0;
+        if (kind === 'mult') cost = 1200; else if (kind === 'slow') cost = 800; else if (kind === 'shield') cost = 600;
+        btn.disabled = score < cost;
+      });
+    }, 800);
 
     // Instructions overlay show/hide + basic focus management
     const instrBtn = document.getElementById('hc-instructions-btn');
