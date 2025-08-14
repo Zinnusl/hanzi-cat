@@ -104,6 +104,8 @@ Agents may append items here with justification:
 - Recovery assistance: Executed dangling blob extraction after an unrecoverable git reset --hard on an unborn branch (no commits yet); enumerated and exported loose object blobs for potential manual file reconstruction. No commit created; recovery directory contents are ephemeral and not tracked.
 - Extended recovery enumeration: Re-ran robust loose object enumeration, extracted all available dangling blobs into recovery directories, applied multi-pass Rust source heuristics (pattern scoring, lowered thresholds) but found no definitive Rust source file; documented manual fallback strategies (pattern grep, editor backups, OS-level recovery).
 - Web entrypoint: Added index.html loader (ES module) expecting wasm-pack generated pkg/ with init() and start_game(); documented build & serve instructions for development in file comment.
+- Hanzi outline contrast: Added consistent black stroke outline for all falling notes (except red danger outline in claw zone) to improve readability against sushi bases.
+- GitHub Pages CI: Introduced gh-pages.yml workflow building via wasm-pack (target web, release) and deploying index.html + pkg/ to GitHub Pages.
 
 ---
 This document is a living reference for agents. Update responsibly and keep it tightly aligned with actual repository state.

@@ -344,17 +344,24 @@ fn tick_and_render(game: &mut Game, now: f64) {
         }
 
         if is_claw_zone {
-            // Surprised / scared styling
+            // Surprised / scared styling retains red outline for danger zone
             game.ctx.set_fill_style(&JsValue::from_str("#ffffff"));
-            // Stroke outline shock effect
             game.ctx.set_stroke_style(&JsValue::from_str("#ff4d4d"));
             game.ctx.set_line_width(4.0);
             game.ctx.stroke_text(note.hanzi, game.width / 2.0, y).ok();
         } else if is_target {
+            // Target note uses gold fill; add black outline for contrast over sushi
             game.ctx.set_fill_style(&JsValue::from_str("#ffd166"));
+            game.ctx.set_stroke_style(&JsValue::from_str("#000"));
+            game.ctx.set_line_width(6.0);
+            game.ctx.stroke_text(note.hanzi, game.width / 2.0, y).ok();
         } else {
+            // Non-target note gets white (variable alpha) with black outline for readability
             game.ctx
                 .set_fill_style(&JsValue::from_str(&format!("rgba(255,255,255,{alpha})")));
+            game.ctx.set_stroke_style(&JsValue::from_str("#000"));
+            game.ctx.set_line_width(6.0);
+            game.ctx.stroke_text(note.hanzi, game.width / 2.0, y).ok();
         }
         game.ctx.fill_text(note.hanzi, game.width / 2.0, y).ok();
         if is_target {
