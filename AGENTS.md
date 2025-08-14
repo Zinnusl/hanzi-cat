@@ -106,6 +106,7 @@ Agents may append items here with justification:
 - Web entrypoint: Added index.html loader (ES module) expecting wasm-pack generated pkg/ with init() and start_game(); documented build & serve instructions for development in file comment.
 - Hanzi outline contrast: Added consistent black stroke outline for all falling notes (except red danger outline in claw zone) to improve readability against sushi bases.
 - GitHub Pages CI: Introduced gh-pages.yml workflow building via wasm-pack (target web, release) and deploying index.html + pkg/ to GitHub Pages.
+- CI fix: Replaced ad-hoc curl pipe install of wasm-pack with jetli/wasm-pack-action@v0.4.0 for reliable installation on GitHub-hosted runners.
 
 ---
 This document is a living reference for agents. Update responsibly and keep it tightly aligned with actual repository state.
