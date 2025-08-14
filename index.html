@@ -50,6 +50,7 @@
         start_game();
         const boot = document.getElementById('boot');
         if (boot) boot.remove();
+        // (Audio init is added outside main via key events.)
       } catch (err) {
         console.error('Failed to load Hanzi Cat WASM:', err);
         const boot = document.getElementById('boot');
@@ -57,6 +58,53 @@
       }
     }
     main();
+
+    // Lightweight reactive keypress sound effects (no external assets, minimal size)
+    // Uses Web Audio API oscillators with short envelopes to provide subtle feedback.
+    const hcAudio = (() => {
+      let ctx = null;
+      function ensureCtx() {
+        if (!ctx) {
+          const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return null; // Browser unsupported
+          ctx = new AC();
+        }
+        return ctx;
+      }
+      function play(kind) {
+        const c = ensureCtx();
+        if (!c) return;
+        const osc = c.createOscillator();
+        const gain = c.createGain();
+        let freq = 440;
+        switch (kind) {
+          case 'letter': freq = 340 + Math.random()*160; break; // slight pitch variance
+          case 'tone': freq = 240 + Math.random()*40; break;
+          case 'enter': freq = 520; break;
+          case 'backspace': freq = 180; break;
+        }
+        osc.frequency.value = freq;
+        const now = c.currentTime;
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.14, now + 0.008);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+        osc.connect(gain).connect(c.destination);
+        osc.start(now);
+        osc.stop(now + 0.25);
+      }
+      return { play };
+    })();
+
+    window.addEventListener('keydown', (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return; // ignore shortcuts
+      // Optionally skip when an instructions dialog (if present) is open
+      const instr = document.getElementById('hc-instructions-overlay');
+      if (instr && instr.getAttribute('aria-hidden') === 'false') return;
+      if (e.key === 'Enter') hcAudio.play('enter');
+      else if (e.key === 'Backspace') hcAudio.play('backspace');
+      else if (/^[1-5]$/.test(e.key)) hcAudio.play('tone');
+      else if (/^[a-zA-Z]$/.test(e.key)) hcAudio.play('letter');
+    });
   </script>
 
   <!-- Alternative manual loader (if not using wasm-pack) - comment kept for reference:

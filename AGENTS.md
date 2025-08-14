@@ -109,6 +109,7 @@ Agents may append items here with justification:
 - CI fix: Replaced ad-hoc curl pipe install of wasm-pack with jetli/wasm-pack-action@v0.4.0 for reliable installation on GitHub-hosted runners.
 - Typed text overlay: Moved in-progress pinyin typing buffer from being drawn on the canvas beneath the cat to a dedicated absolutely positioned DOM element (#hc-typing) layered above the cat for higher visibility; removed old canvas draw block and added CSS with z-index.
 - Instructions overlay: Added top-left Instructions button and accessible dialog overlay (role="dialog", aria-hidden toggle, rudimentary focus trap) presenting controls and gameplay tips; updated README and index.html accordingly.
+- Keypress sound effects: Added lightweight Web Audio oscillator-based feedback for letters, tone digits, Enter, and Backspace (short envelopes, randomized slight pitch). Skips playback while instructions overlay is open to avoid auditory clutter; no external audio assets added. Updated README and index.html.
 
 ---
 This document is a living reference for agents. Update responsibly and keep it tightly aligned with actual repository state.
