@@ -15,6 +15,7 @@ A tiny Rust → WebAssembly rhythm / reaction & typing game to help you practice
 - Constant minimalist synth beat (kick / snare / hi-hat) loops at ~120 BPM after your first key or pointer input; interactive keystroke modulation adds brief accent swells (plus micro hat blips on letters) and it auto-mutes while the Instructions overlay is open (procedural Web Audio, no assets).
 - Dynamic difficulty ramp over ~3 minutes: spawn interval shrinks (faster notes), fall speed increases, and probability of multi-character words rises for a gentle early on‑ramp that escalates into a denser challenge.
 - Powerups (x2 Score, Slow Time, Shield): spend accumulated score (1200 / 800 / 600) to temporarily double points, slow falling speed & ease spawn pressure, or absorb the next miss (shield stores up to 3 charges). Simple left-side panel with live affordance (buttons disable if you lack score).
+- Expanded Hanzi / word dataset: many more single characters (directions, body parts, nature, basics) and common words (中国, 天气, 老师, 朋友, 手机, 电脑, 米饭, 语言, etc.) for increased variety during play.
 
 ## Controls
 | Action | Key(s) |
