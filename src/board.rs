@@ -424,7 +424,7 @@ pub fn start_board_mode() -> Result<(), JsValue> {
             div.set_id("hc-lives");
             // Render hearts (Minecraft-style) - start with 3 filled hearts
             div.set_inner_html("<span style='color:#ff4d4d;font-size:16px;margin-right:6px;'>♥</span><span style='color:#ff4d4d;font-size:16px;margin-right:6px;'>♥</span><span style='color:#ff4d4d;font-size:16px;'>♥</span>");
-            div.set_attribute("style", "position:fixed; top:10px; left:110px; font-family:'Fira Code', monospace; font-size:15px; padding:4px 8px; background:rgba(0,0,0,0.42); border:1px solid #333; border-radius:6px; z-index:44; letter-spacing:0.5px;").ok();
+            div.set_attribute("style", "position:fixed; top:10px; left:170px; font-family:'Fira Code', monospace; font-size:15px; padding:4px 8px; background:rgba(0,0,0,0.42); border:1px solid #333; border-radius:6px; z-index:44; letter-spacing:0.5px;").ok();
             body.append_child(&div)?;
         }
     }
