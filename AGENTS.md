@@ -121,6 +121,10 @@ Agents may append items here with justification:
 - Falling-note removal & entrypoint unification (tasks c8-3..c8-6): Eliminated legacy falling-note arcade system (notes structs, spawn/update/render loops, sushi bases, combo hearts, difficulty ramp, powerups). Replaced `start_game` implementation with unified board-mode launcher under the existing `board_mode` feature gate (left in place temporarily). Removed powerups export (`purchase_powerup`) logic and associated UI plus outdated instructions in index.html. Simplified lib.rs to datasets + minimal entrypoints, preparing for full board mode adoption.
 - Board mode default (boardfix tasks): Removed `board_mode` feature gate; board module now always compiled and `start_game()` directly launches board-based rhythmic prototype. Purged feature flag reference from Cargo.toml and updated README to describe board prototype (falling-note classic mode & cat visuals retired for now). AGENTS change log updated accordingly; groundwork laid for reintroducing typing & scoring atop board system.
 
+- Added levels 6 and 7 ("Crystal Isle" and "Neon Bastion"): created `src/board_level6.rs` and `src/board_level7.rs`, registered the modules in `src/board.rs`, exported `LEVEL6_HANZI` / `LEVEL7_HANZI`, and extended `LEVEL_SCORE_THRESHOLDS` and the `levels()` list to include the new entries.
+
+- Synchronized repository layout: moved new level modules under `src/board/` to match existing module path expectations.
+
 ---
 This document is a living reference for agents. Update responsibly and keep it tightly aligned with actual repository state.
 

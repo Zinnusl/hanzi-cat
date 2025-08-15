@@ -4,7 +4,7 @@ use super::{TileDesc, LevelDesc};
 use std::sync::OnceLock;
 
 fn build_level1_tiles() -> &'static [TileDesc] {
-    let mut arr: Vec<TileDesc> = vec![TileDesc { obstacle: None, modifier: None }; 81];
+    let arr: Vec<TileDesc> = vec![TileDesc { obstacle: None, modifier: None }; 81];
     // No special tiles for level1 in original definition
     Box::leak(arr.into_boxed_slice())
 }

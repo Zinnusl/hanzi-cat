@@ -183,12 +183,16 @@ mod board_level2;
 mod board_level3;
 mod board_level4;
 mod board_level5;
+mod board_level6;
+mod board_level7;
 
 // Export per-level hanzi arrays where present for external code
 pub use board_level2::LEVEL2_HANZI;
 pub use board_level3::LEVEL3_HANZI;
 pub use board_level4::LEVEL4_HANZI;
 pub use board_level5::LEVEL5_HANZI;
+pub use board_level6::LEVEL6_HANZI;
+pub use board_level7::LEVEL7_HANZI;
 
 // Runtime-built static levels array. Some level modules provide `levelN()` getters
 // (used where tiles are runtime-built), others keep `LEVELN` statics; we unify
@@ -202,11 +206,13 @@ fn levels() -> &'static [&'static LevelDesc] {
         let l3: &'static LevelDesc = &board_level3::LEVEL3;
         let l4 = board_level4::level4();
         let l5 = board_level5::level5();
-        Box::leak(vec![l1, l2, l3, l4, l5].into_boxed_slice())
+        let l6 = board_level6::level6();
+        let l7 = board_level7::level7();
+        Box::leak(vec![l1, l2, l3, l4, l5, l6, l7].into_boxed_slice())
     })
 }
 
-pub static LEVEL_SCORE_THRESHOLDS: [i64; 5] = [0, 2500, 6000, 12000, 20000];
+pub static LEVEL_SCORE_THRESHOLDS: [i64; 7] = [0, 2500, 6000, 12000, 20000, 32000, 50000];
 
 
 
@@ -522,6 +528,14 @@ fn on_new_beat(state: &mut BoardState, beat_idx: i64, now: f64) {
                 "Spiral Dream" => {
                     let hidx = rand_index(LEVEL5_HANZI.len());
                     LEVEL5_HANZI[hidx]
+                }
+                "Crystal Isle" => {
+                    let hidx = rand_index(LEVEL6_HANZI.len());
+                    LEVEL6_HANZI[hidx]
+                }
+                "Neon Bastion" => {
+                    let hidx = rand_index(LEVEL7_HANZI.len());
+                    LEVEL7_HANZI[hidx]
                 }
                 _ => ("你", "ni3"),
             };
