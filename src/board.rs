@@ -177,175 +177,38 @@ struct BoardState {
 }
 
 // --- Static Prototype Level --------------------------------------------------
+// Board definitions are now in separate files:
+mod board_level1;
+mod board_level2;
+mod board_level3;
+mod board_level4;
+mod board_level5;
 
-// Level 1: Simple introduction board (9x9), no obstacles or modifiers.
-const LEVEL1_TILES: [TileDesc; 81] = {
-    let arr: [TileDesc; 81] = [TileDesc {
-        obstacle: None,
-        modifier: None,
-    }; 81];
-    arr
-};
+// Export per-level hanzi arrays where present for external code
+pub use board_level2::LEVEL2_HANZI;
+pub use board_level3::LEVEL3_HANZI;
+pub use board_level4::LEVEL4_HANZI;
+pub use board_level5::LEVEL5_HANZI;
 
-static LEVEL1: LevelDesc = LevelDesc {
-    name: "Opening Board",
-    width: 3,
-    height: 9,
-    bpm: 120.0,
-    tiles: &LEVEL1_TILES,
-    // All top-row cells are spawn points (requirement: spawn from any top field)
-    spawn_points: &[(0, 0), (1, 0), (2, 0)],
-    goal_region: &[(1, 8)],
-};
+// Runtime-built static levels array. Some level modules provide `levelN()` getters
+// (used where tiles are runtime-built), others keep `LEVELN` statics; we unify
+// access via this `levels()` function returning &'static [&'static LevelDesc].
+fn levels() -> &'static [&'static LevelDesc] {
+    use std::sync::OnceLock;
+    static LEVELS_STATIC: OnceLock<&'static [&'static LevelDesc]> = OnceLock::new();
+    *LEVELS_STATIC.get_or_init(|| {
+        let l1 = board_level1::level1();
+        let l2 = board_level2::level2();
+        let l3: &'static LevelDesc = &board_level3::LEVEL3;
+        let l4 = board_level4::level4();
+        let l5 = board_level5::level5();
+        Box::leak(vec![l1, l2, l3, l4, l5].into_boxed_slice())
+    })
+}
 
-// Level 2: Introduces conveyors, tempo shift and transform tile.
-const LEVEL2_TILES: [TileDesc; 81] = {
-    use ObstacleKind::*;
-    let mut arr: [TileDesc; 81] = [TileDesc {
-        obstacle: None,
-        modifier: None,
-    }; 81];
-    // Wall of blocks near middle forcing alternate paths (x = 1..=7 at y=3) with new width 9
-    arr[9 * 3 + 1] = TileDesc {
-        obstacle: Some(Block),
-        modifier: None,
-    };
-    arr[9 * 3 + 2] = TileDesc {
-        obstacle: Some(Block),
-        modifier: None,
-    };
-    arr[9 * 3 + 3] = TileDesc {
-        obstacle: Some(Block),
-        modifier: None,
-    };
-    arr[9 * 3 + 4] = TileDesc {
-        obstacle: Some(Block),
-        modifier: None,
-    };
-    arr[9 * 3 + 5] = TileDesc {
-        obstacle: Some(Block),
-        modifier: None,
-    };
-    arr[9 * 3 + 6] = TileDesc {
-        obstacle: Some(Block),
-        modifier: None,
-    };
-    arr[9 * 3 + 7] = TileDesc {
-        obstacle: Some(Block),
-        modifier: None,
-    };
-    // Conveyors downward lane at x=2 (rows 0..2)
-    arr[9 * 0 + 2] = TileDesc {
-        obstacle: Some(Conveyor { dx: 0, dy: 1 }),
-        modifier: None,
-    }; // (2,0)
-    arr[9 * 1 + 2] = TileDesc {
-        obstacle: Some(Conveyor { dx: 0, dy: 1 }),
-        modifier: None,
-    }; // (2,1)
-    arr[9 * 2 + 2] = TileDesc {
-        obstacle: Some(Conveyor { dx: 0, dy: 1 }),
-        modifier: None,
-    }; // (2,2)
-    // Tempo shift tile speeds hops briefly (5,5)
-    arr[9 * 5 + 5] = TileDesc {
-        obstacle: Some(TempoShift {
-            mult: 1.35,
-            beats: 4,
-        }),
-        modifier: None,
-    };
-    // Transform tile (map 你->好) at (6,6)
-    arr[9 * 6 + 6] = TileDesc {
-        obstacle: Some(Transform),
-        modifier: Some(ModifierKind::TransformMap {
-            pairs: &[("你", "好")],
-        }),
-    };
-    arr
-};
+pub static LEVEL_SCORE_THRESHOLDS: [i64; 5] = [0, 2500, 6000, 12000, 20000];
 
-static LEVEL2: LevelDesc = LevelDesc {
-    name: "Conveyor Crossing",
-    width: 9,
-    height: 9,
-    bpm: 126.0,
-    tiles: &LEVEL2_TILES,
-    // All top-row cells spawn-capable
-    spawn_points: &[
-        (0, 0),
-        (1, 0),
-        (2, 0),
-        (3, 0),
-        (4, 0),
-        (5, 0),
-        (6, 0),
-        (7, 0),
-        (8, 0),
-    ],
-    goal_region: &[(8, 8)],
-};
 
-// Level 3: Complex board with more obstacles and Hanzi
-const LEVEL3_TILES: [TileDesc; 81] = [
-    // y = 0
-    TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Teleport { to: (0, 8) }), modifier: None },
-    // y = 1
-    TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Conveyor { dx: 1, dy: 0 }), modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None },
-    // y = 2
-    TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: None, modifier: None },
-    // y = 3
-    TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None },
-    // y = 4
-    TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: Some(ObstacleKind::TempoShift { mult: 1.5, beats: 3 }), modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None },
-    // y = 5
-    TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Conveyor { dx: -1, dy: 0 }), modifier: None }, TileDesc { obstacle: None, modifier: None },
-    // y = 6
-    TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: None, modifier: None },
-    // y = 7
-    TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Transform), modifier: Some(ModifierKind::TransformMap { pairs: &[("水", "火"), ("山", "田")] }) }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None },
-    // y = 8
-    TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None },
-];
-
-static LEVEL3_HANZI: [(&str, &str); 10] = [
-    ("水", "shui3"),
-    ("火", "huo3"),
-    ("山", "shan1"),
-    ("田", "tian2"),
-    ("风", "feng1"),
-    ("雨", "yu3"),
-    ("日", "ri4"),
-    ("月", "yue4"),
-    ("木", "mu4"),
-    ("石", "shi2"),
-];
-
-static LEVEL3: LevelDesc = LevelDesc {
-    name: "Maze Challenge",
-    width: 9,
-    height: 9,
-    bpm: 132.0,
-    tiles: &LEVEL3_TILES,
-    spawn_points: &[
-        (0, 0),
-        (1, 0),
-        (2, 0),
-        (3, 0),
-        (4, 0),
-        (5, 0),
-        (6, 0),
-        (7, 0),
-        (8, 0),
-    ],
-    goal_region: &[(4, 8), (5, 8), (6, 8)],
-};
-
-// Ordered level sequence & score thresholds for progression (score must be >= threshold to enter level index)
-static LEVELS: [&LevelDesc; 3] = [&LEVEL1, &LEVEL2, &LEVEL3];
-static LEVEL_SCORE_THRESHOLDS: [i64; 3] = [0, 2500, 6000];
-
-// --- WASM Entry (board mode) -------------------------------------------------
 
 #[wasm_bindgen]
 pub fn start_board_mode() -> Result<(), JsValue> {
@@ -376,8 +239,8 @@ pub fn start_board_mode() -> Result<(), JsValue> {
     let board = BoardState {
         canvas: canvas.clone(),
         ctx: ctx.clone(),
-        level: LEVELS[0],
-        beat: BeatClock::new(LEVELS[0].bpm, now),
+        level: levels()[0],
+        beat: BeatClock::new(levels()[0].bpm, now),
         pieces: Vec::new(),
         last_spawn_beat: -1,
         level_index: 0,
@@ -431,7 +294,6 @@ pub fn start_board_mode() -> Result<(), JsValue> {
 
     // Keyboard listener for pinyin typing
     {
-        
         let closure = Closure::wrap(Box::new(move |evt: web_sys::KeyboardEvent| {
             BOARD_STATE.with(|state_cell| {
                 if let Some(state) = state_cell.borrow_mut().as_mut() {
@@ -511,10 +373,8 @@ pub fn start_board_mode() -> Result<(), JsValue> {
 
     // Mouse move listener for hover tile tracking (visual placeholder only)
     {
-        use wasm_bindgen::JsCast;
         let canvas_move = canvas.clone();
         let closure = Closure::wrap(Box::new(move |evt: web_sys::MouseEvent| {
-            use wasm_bindgen::JsCast;
             // Use offset coordinates relative to the event target (canvas) to avoid
             // depending on js_sys / DomRect. offset_x/offset_y are available on
             // MouseEvent and are simpler for canvas-local coordinates.
@@ -543,7 +403,6 @@ pub fn start_board_mode() -> Result<(), JsValue> {
     }
     // Mouse leave clears hover
     {
-        use wasm_bindgen::JsCast;
         let canvas_leave = canvas.clone();
         let closure = Closure::wrap(Box::new(move |_evt: web_sys::MouseEvent| {
             BOARD_STATE.with(|cell| {
@@ -635,15 +494,6 @@ fn board_tick(state: &mut BoardState, now: f64) {
     }
 }
 
-// Hanzi and pinyin for LEVEL2
-static LEVEL2_HANZI: [(&str, &str); 6] = [
-    ("你", "ni3"),
-    ("好", "hao3"),
-    ("天", "tian1"),
-    ("气", "qi4"),
-    ("中", "zhong1"),
-    ("国", "guo2"),
-];
 
 fn on_new_beat(state: &mut BoardState, beat_idx: i64, now: f64) {
     // Base hop duration (one half-beat @ 120 BPM ~= 250ms, scaled by hop_time_factor)
@@ -655,12 +505,25 @@ fn on_new_beat(state: &mut BoardState, beat_idx: i64, now: f64) {
         if !state.level.spawn_points.is_empty() {
             let idx = rand_index(state.level.spawn_points.len());
             let (sx, sy) = state.level.spawn_points[idx];
-            // For LEVEL2, spawn random Hanzi from LEVEL2_HANZI
-            let (hanzi, pinyin) = if state.level.name == "Conveyor Crossing" {
-                let hidx = rand_index(LEVEL2_HANZI.len());
-                LEVEL2_HANZI[hidx]
-            } else {
-                ("你", "ni3")
+            // Select Hanzi set based on current level
+            let (hanzi, pinyin) = match state.level.name {
+                "Conveyor Crossing" => {
+                    let hidx = rand_index(LEVEL2_HANZI.len());
+                    LEVEL2_HANZI[hidx]
+                }
+                "Zigzag Express" => {
+                    let hidx = rand_index(LEVEL4_HANZI.len());
+                    LEVEL4_HANZI[hidx]
+                }
+                "Maze Challenge" => {
+                    let hidx = rand_index(LEVEL3_HANZI.len());
+                    LEVEL3_HANZI[hidx]
+                }
+                "Spiral Dream" => {
+                    let hidx = rand_index(LEVEL5_HANZI.len());
+                    LEVEL5_HANZI[hidx]
+                }
+                _ => ("你", "ni3"),
             };
             let piece = Piece::new(hanzi, pinyin, sx, sy, now, base_hop_ms);
             state.pieces.push(piece);
@@ -758,9 +621,7 @@ fn render_board(state: &mut BoardState, now: f64) {
         (bg + 14).clamp(0, 255),
         (bg + 12).clamp(0, 255)
     );
-    state
-        .ctx
-        .set_fill_style(&wasm_bindgen::JsValue::from_str(&color));
+    state.ctx.set_fill_style_str(&color);
     state.ctx.fill_rect(
         0.0,
         0.0,
@@ -769,19 +630,13 @@ fn render_board(state: &mut BoardState, now: f64) {
     );
 
     // Spawn row accent (assumes all spawns top row). Draw subtle translucent band.
-    let cell_w = state.canvas.width() as f64 / state.level.width as f64;
-    let cell_h = state.canvas.height() as f64 / state.level.height as f64;
-    state
-        .ctx
-        .set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(255,220,120,0.08)"));
+    state.ctx.set_fill_style_str("rgba(255,220,120,0.08)");
     state
         .ctx
         .fill_rect(0.0, 0.0, state.canvas.width() as f64, cell_h);
 
     // Goal region highlight tiles (before grid so lines appear above)
-    state
-        .ctx
-        .set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(120,200,255,0.10)"));
+    state.ctx.set_fill_style_str("rgba(120,200,255,0.10)");
     for &(gx, gy) in state.level.goal_region.iter() {
         let px = gx as f64 * cell_w;
         let py = gy as f64 * cell_h;
@@ -789,9 +644,7 @@ fn render_board(state: &mut BoardState, now: f64) {
     }
 
     // Draw grid
-    state
-        .ctx
-        .set_stroke_style(&wasm_bindgen::JsValue::from_str("#222"));
+    state.ctx.set_stroke_style_str("#222");
     state.ctx.set_line_width(2.0);
     for x in 0..=state.level.width {
         let fx = x as f64 * cell_w;
@@ -807,9 +660,7 @@ fn render_board(state: &mut BoardState, now: f64) {
         if hx < state.level.width && hy < state.level.height {
             let px = hx as f64 * cell_w;
             let py = hy as f64 * cell_h;
-            state
-                .ctx
-                .set_stroke_style(&wasm_bindgen::JsValue::from_str("rgba(255,240,150,0.55)"));
+            state.ctx.set_stroke_style_str("rgba(255,240,150,0.55)");
             state.ctx.set_line_width(3.0);
             state
                 .ctx
@@ -846,23 +697,17 @@ fn render_board(state: &mut BoardState, now: f64) {
         state.ctx.set_shadow_offset_x(0.0);
         state.ctx.set_shadow_offset_y(4.0);
         state.ctx.set_line_width(6.0);
-        state
-            .ctx
-            .set_stroke_style(&wasm_bindgen::JsValue::from_str("rgba(0,0,0,0.85)"));
+        state.ctx.set_stroke_style_str("rgba(0,0,0,0.85)");
         state.ctx.stroke_text(p.hanzi, cx, cy).ok();
         // Remove shadow for fill to stay crisp
         state.ctx.set_shadow_blur(0.0);
         state.ctx.set_shadow_offset_x(0.0);
         state.ctx.set_shadow_offset_y(0.0);
-        state
-            .ctx
-            .set_fill_style(&wasm_bindgen::JsValue::from_str("#ffffff"));
+        state.ctx.set_fill_style_str("#ffffff");
         state.ctx.fill_text(p.hanzi, cx, cy).ok();
         // Accent inner glow stroke
         state.ctx.set_line_width(2.0);
-        state
-            .ctx
-            .set_stroke_style(&wasm_bindgen::JsValue::from_str("rgba(255,210,120,0.55)"));
+        state.ctx.set_stroke_style_str("rgba(255,210,120,0.55)");
         state.ctx.stroke_text(p.hanzi, cx, cy).ok();
     }
 
@@ -883,9 +728,7 @@ fn render_board(state: &mut BoardState, now: f64) {
         state.ctx.set_line_width(4.0);
         state
             .ctx
-            .set_stroke_style(&wasm_bindgen::JsValue::from_str(&format!(
-                "rgba(255,80,80,{alpha})"
-            )));
+            .set_stroke_style_str(&format!("rgba(255,80,80,{alpha})"));
         // Three parallel diagonal slashes
         for i in 0..3 {
             let offset = i as f64 * 6.0;
@@ -898,24 +741,18 @@ fn render_board(state: &mut BoardState, now: f64) {
 
     // GAME OVER overlay
     if state.game_over {
-        state
-            .ctx
-            .set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(0,0,0,0.55)"));
+        state.ctx.set_fill_style_str("rgba(0,0,0,0.55)");
         state.ctx.fill_rect(
             0.0,
             0.0,
             state.canvas.width() as f64,
             state.canvas.height() as f64,
         );
-        state
-            .ctx
-            .set_fill_style(&wasm_bindgen::JsValue::from_str("#ffffff"));
+        state.ctx.set_fill_style_str("#ffffff");
         state.ctx.set_font("72px 'Noto Serif SC', serif");
         state.ctx.set_text_align("center");
         state.ctx.set_line_width(6.0);
-        state
-            .ctx
-            .set_stroke_style(&wasm_bindgen::JsValue::from_str("#000000"));
+        state.ctx.set_stroke_style_str("#000000");
         let cx = state.canvas.width() as f64 / 2.0;
         let cy = state.canvas.height() as f64 / 2.0;
         state.ctx.stroke_text("GAME OVER", cx, cy).ok();
@@ -941,9 +778,9 @@ fn draw_obstacle(
     match obs {
         ObstacleKind::Block => {
             // Solid block with subtle inner X pattern
-            ctx.set_fill_style(&JsValue::from_str("#552222"));
+            ctx.set_fill_style_str("#552222");
             ctx.fill_rect(px + 2.0, py + 2.0, cw - 4.0, ch - 4.0);
-            ctx.set_stroke_style(&JsValue::from_str("rgba(255,200,200,0.15)"));
+            ctx.set_stroke_style_str("rgba(255,200,200,0.15)");
             ctx.set_line_width(3.0);
             ctx.begin_path();
             ctx.move_to(px + 4.0, py + 4.0);
@@ -954,7 +791,7 @@ fn draw_obstacle(
         }
         ObstacleKind::Teleport { .. } => {
             // Portal: ring + inner glow square
-            ctx.set_stroke_style(&JsValue::from_str("#4aa3ff"));
+            ctx.set_stroke_style_str("#4aa3ff");
             ctx.set_line_width(4.0);
             ctx.begin_path();
             let cx = px + cw / 2.0;
@@ -962,15 +799,15 @@ fn draw_obstacle(
             let r = (cw.min(ch)) * 0.33;
             ctx.arc(cx, cy, r, 0.0, std::f64::consts::TAU).ok();
             ctx.stroke();
-            ctx.set_fill_style(&JsValue::from_str("rgba(70,140,255,0.25)"));
+            ctx.set_fill_style_str("rgba(70,140,255,0.25)");
             let side = r * 1.1;
             ctx.fill_rect(cx - side / 2.0, cy - side / 2.0, side, side);
         }
         ObstacleKind::Conveyor { dx, dy } => {
             // Belt: darker base + directional chevrons
-            ctx.set_fill_style(&JsValue::from_str("#334433"));
+            ctx.set_fill_style_str("#334433");
             ctx.fill_rect(px + 2.0, py + 2.0, cw - 4.0, ch - 4.0);
-            ctx.set_fill_style(&JsValue::from_str("#88cc88"));
+            ctx.set_fill_style_str("#88cc88");
             // Draw 3 small chevrons along movement axis
             let chevrons = 3;
             for i in 0..chevrons {
@@ -1010,9 +847,9 @@ fn draw_obstacle(
         }
         ObstacleKind::TempoShift { .. } => {
             // Metronome tile: base + swinging arm representation
-            ctx.set_fill_style(&JsValue::from_str("#444455"));
+            ctx.set_fill_style_str("#444455");
             ctx.fill_rect(px + 2.0, py + 2.0, cw - 4.0, ch - 4.0);
-            ctx.set_stroke_style(&JsValue::from_str("#b0b0ff"));
+            ctx.set_stroke_style_str("#b0b0ff");
             ctx.set_line_width(3.0);
             let base_w = cw * 0.28;
             let base_x = px + cw / 2.0 - base_w / 2.0;
@@ -1029,9 +866,9 @@ fn draw_obstacle(
         }
         ObstacleKind::Transform => {
             // Transform tile: gradient-like base + double arrow
-            ctx.set_fill_style(&JsValue::from_str("#333355"));
+            ctx.set_fill_style_str("#333355");
             ctx.fill_rect(px + 2.0, py + 2.0, cw - 4.0, ch - 4.0);
-            ctx.set_stroke_style(&JsValue::from_str("#aac"));
+            ctx.set_stroke_style_str("#aac");
             ctx.set_line_width(3.0);
             ctx.begin_path();
             let mid_y = py + ch / 2.0;
@@ -1121,7 +958,7 @@ fn expire_effects(state: &mut BoardState, current_beat: i64) {
 
 fn check_level_progression(state: &mut BoardState, now: f64, current_beat: i64) {
     // If next level exists and score threshold reached, advance.
-    if state.level_index + 1 < LEVELS.len() {
+    if state.level_index + 1 < levels().len() {
         let next_idx = state.level_index + 1;
         if state.score >= LEVEL_SCORE_THRESHOLDS[next_idx] {
             set_level(state, next_idx, now, current_beat);
@@ -1131,7 +968,7 @@ fn check_level_progression(state: &mut BoardState, now: f64, current_beat: i64) 
 
 fn set_level(state: &mut BoardState, new_index: usize, now: f64, current_beat: i64) {
     state.level_index = new_index;
-    state.level = LEVELS[new_index];
+    state.level = levels()[new_index];
     state.pieces.clear();
     state.last_spawn_beat = current_beat; // prevent immediate double-spawn
     state.beat = BeatClock {
