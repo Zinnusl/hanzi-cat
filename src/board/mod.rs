@@ -52,6 +52,13 @@ pub enum ObstacleKind {
     Teleport { to: (u8, u8) },            // Enter -> instantly relocate
     Conveyor { dx: i8, dy: i8 },          // Auto-push piece after landing
     TempoShift { mult: f64, beats: u32 }, // Temporary BPM multiplier effect when stepped on
+    /// Ice: slippery tile — a piece that arrives continues moving in its incoming
+    /// direction on subsequent beats (momentum = 1). If a piece has no direction
+    /// when arriving, it will choose a greedy step toward the goal and then slide.
+    Ice,
+    /// JumpPad: launches a piece further in a direction. If dx/dy are zero the
+    /// pad will launch toward the nearest goal. strength = how many tiles to jump.
+    JumpPad { dx: i8, dy: i8, strength: u8 },
     Transform, // Placeholder: triggers Hanzi transformation mapping (handled by ModifierKind::TransformMap)
 }
 
@@ -97,7 +104,8 @@ impl LevelDesc {
 }
 
 /// Active piece on the board (represents a Hanzi / word). For now only one piece hops;
-/// future: multiple simultaneous streams.
+/// future: multiple simultaneous streams. Pieces now carry a small notion of direction
+/// and short-lived momentum so tiles like Ice and JumpPad can influence motion.
 struct Piece {
     hanzi: &'static str,
     pinyin: &'static str,
@@ -108,10 +116,26 @@ struct Piece {
     hop_start_ms: f64,
     hop_duration_ms: f64,
     arrived: bool,
+    /// Normalized movement direction of the last hop (-1/0/1 per axis)
+    dir_dx: i8,
+    dir_dy: i8,
+    /// Short-lived momentum (in tiles) that causes automatic continued movement
+    /// (used by Ice tiles). 0 means no momentum.
+    momentum: u8,
 }
 
 impl Piece {
     fn begin_hop(&mut self, to_x: u8, to_y: u8, now: f64, duration_ms: f64) {
+        // Record normalized direction so tile effects (ice / conveyors) can
+        // continue movement in the same axis.
+        let dx_i = to_x as i8 - self.x as i8;
+        let dy_i = to_y as i8 - self.y as i8;
+        self.dir_dx = dx_i.signum();
+        self.dir_dy = dy_i.signum();
+        // Default small momentum so ice can pick it up. Specific tiles may
+        // override momentum later (e.g. JumpPad will zero it).
+        self.momentum = 1;
+
         self.target_x = to_x;
         self.target_y = to_y;
         self.hop_start_ms = now;
@@ -139,6 +163,9 @@ impl Piece {
             hop_start_ms: now,
             hop_duration_ms: hop_dur,
             arrived: true,
+            dir_dx: 0,
+            dir_dy: 0,
+            momentum: 0,
         }
     }
 }
@@ -185,6 +212,7 @@ mod board_level4;
 mod board_level5;
 mod board_level6;
 mod board_level7;
+// child level modules live under src/board/*.rs
 
 // Export per-level hanzi arrays where present for external code
 pub use board_level2::LEVEL2_HANZI;
@@ -549,7 +577,7 @@ fn on_new_beat(state: &mut BoardState, beat_idx: i64, now: f64) {
         if !p.arrived {
             continue;
         }
-        if let Some((nx, ny)) = choose_next_step(state.level, p.x, p.y) {
+        if let Some((nx, ny)) = choose_next_for_piece(state.level, p) {
             p.begin_hop(nx, ny, now, base_hop_ms);
         }
     }
@@ -789,7 +817,7 @@ fn draw_obstacle(
 ) {
     let px = x as f64 * cw;
     let py = y as f64 * ch;
-    match obs {
+    match *obs {
         ObstacleKind::Block => {
             // Solid block with subtle inner X pattern
             ctx.set_fill_style_str("#552222");
@@ -829,7 +857,7 @@ fn draw_obstacle(
                 let (cx, cy) = (px + 2.0 + (cw - 4.0) * t, py + 2.0 + (ch - 4.0) * t);
                 ctx.begin_path();
                 let size = 6.0;
-                match (*dx, *dy) {
+                match (dx, dy) {
                     (1, 0) => {
                         // right
                         ctx.move_to(cx - size, py + ch / 2.0 - size * 0.8);
@@ -877,6 +905,69 @@ fn draw_obstacle(
             ctx.move_to(px + cw / 2.0, base_y);
             ctx.line_to(px + cw / 2.0 + cw * 0.18, py + ch * 0.30);
             ctx.stroke();
+        }
+        ObstacleKind::Ice => {
+            // Ice: slippery pale tile with a snowflake-like symbol
+            ctx.set_fill_style_str("#224466");
+            ctx.fill_rect(px + 2.0, py + 2.0, cw - 4.0, ch - 4.0);
+            ctx.set_stroke_style_str("rgba(200,230,255,0.9)");
+            ctx.set_line_width(2.0);
+            // simple snowflake lines
+            let cx = px + cw / 2.0;
+            let cy = py + ch / 2.0;
+            let r = (cw.min(ch)) * 0.18;
+            ctx.begin_path();
+            ctx.move_to(cx - r, cy);
+            ctx.line_to(cx + r, cy);
+            ctx.move_to(cx, cy - r);
+            ctx.line_to(cx, cy + r);
+            ctx.move_to(cx - r * 0.7, cy - r * 0.7);
+            ctx.line_to(cx + r * 0.7, cy + r * 0.7);
+            ctx.move_to(cx - r * 0.7, cy + r * 0.7);
+            ctx.line_to(cx + r * 0.7, cy - r * 0.7);
+            ctx.stroke();
+        }
+        ObstacleKind::JumpPad { dx, dy, strength } => {
+            // JumpPad: bright pad with arrow showing direction and a strength number
+            ctx.set_fill_style_str("#554488");
+            ctx.fill_rect(px + 2.0, py + 2.0, cw - 4.0, ch - 4.0);
+            ctx.set_fill_style_str("#ffdd88");
+            // arrow center
+            let cx = px + cw / 2.0;
+            let cy = py + ch / 2.0;
+            let size = (cw.min(ch)) * 0.18;
+            ctx.begin_path();
+            match (dx, dy) {
+                (1, 0) => {
+                    ctx.move_to(cx - size, cy - size);
+                    ctx.line_to(cx + size, cy);
+                    ctx.line_to(cx - size, cy + size);
+                }
+                (-1, 0) => {
+                    ctx.move_to(cx + size, cy - size);
+                    ctx.line_to(cx - size, cy);
+                    ctx.line_to(cx + size, cy + size);
+                }
+                (0, 1) => {
+                    ctx.move_to(cx - size, cy - size);
+                    ctx.line_to(cx, cy + size);
+                    ctx.line_to(cx + size, cy - size);
+                }
+                (0, -1) => {
+                    ctx.move_to(cx - size, cy + size);
+                    ctx.line_to(cx, cy - size);
+                    ctx.line_to(cx + size, cy + size);
+                }
+                _ => {
+                    // no direction: draw a burst
+                    ctx.arc(cx, cy, size, 0.0, std::f64::consts::TAU).ok();
+                }
+            }
+            ctx.fill();
+            // strength number in corner
+            ctx.set_fill_style_str("#ffffff");
+            ctx.set_font("12px 'Fira Code', monospace");
+            ctx.fill_text(&format!("{}", strength), px + cw - 14.0, py + ch - 8.0).ok();
         }
         ObstacleKind::Transform => {
             // Transform tile: gradient-like base + double arrow
@@ -932,6 +1023,47 @@ fn apply_tile_effects(piece: &mut Piece, state: &mut BoardState, current_beat: i
             ObstacleKind::TempoShift { mult, beats } => {
                 state.hop_time_factor *= 1.0 / mult; // faster tempo => shorter hops
                 state.hop_time_end_beat = current_beat + *beats as i64;
+            }
+            ObstacleKind::Ice => {
+                // If the piece has a known direction, enable sliding momentum.
+                if piece.dir_dx == 0 && piece.dir_dy == 0 {
+                    // choose a greedy direction toward goal so the piece will slide
+                    if let Some((nx, ny)) = choose_next_step(state.level, piece.x, piece.y) {
+                        piece.dir_dx = (nx as i8 - piece.x as i8).signum();
+                        piece.dir_dy = (ny as i8 - piece.y as i8).signum();
+                    }
+                }
+                piece.momentum = 1;
+            }
+            ObstacleKind::JumpPad { dx, dy, strength } => {
+                // Launch the piece `strength` tiles in the given direction,
+                // or toward the first goal if dx/dy == 0.
+                let mut ldx = *dx;
+                let mut ldy = *dy;
+                if ldx == 0 && ldy == 0 {
+                    // pick direction toward nearest goal
+                    if let Some(&(gx, gy)) = state.level.goal_region.first() {
+                        ldx = (gx as i8 - piece.x as i8).signum();
+                        ldy = (gy as i8 - piece.y as i8).signum();
+                    }
+                }
+                let mut tx = piece.x as i8;
+                let mut ty = piece.y as i8;
+                for _ in 0..*strength {
+                    let nx = tx + ldx;
+                    let ny = ty + ldy;
+                    if nx < 0 || ny < 0 || (nx as u8) >= state.level.width || (ny as u8) >= state.level.height {
+                        break;
+                    }
+                    if matches!(state.level.tile(nx as u8, ny as u8).obstacle, Some(ObstacleKind::Block)) {
+                        break;
+                    }
+                    tx = nx;
+                    ty = ny;
+                }
+                // Queue a faster hop to the landing tile
+                piece.begin_hop(tx as u8, ty as u8, _now, piece.hop_duration_ms * 0.6);
+                piece.momentum = 0; // jump breaks sliding momentum
             }
             ObstacleKind::Block => { /* cannot stand here normally (shouldn't happen) */ }
             ObstacleKind::Transform => { /* handled via modifier if present */ }
@@ -1009,6 +1141,44 @@ fn rand_index(len: usize) -> usize {
         .wrapping_mul(1664525)
         .wrapping_add(1013904223)
         % len
+}
+
+/// Decide next step for a piece taking into account momentum (ice), jump pads, and
+/// simple heuristics. Returns the next tile to hop to if any.
+fn choose_next_for_piece(level: &LevelDesc, p: &Piece) -> Option<(u8, u8)> {
+    let x = p.x;
+    let y = p.y;
+
+    // If we have momentum, attempt to continue in that direction
+    if p.momentum > 0 && (p.dir_dx != 0 || p.dir_dy != 0) {
+        let nx = x as i8 + p.dir_dx;
+        let ny = y as i8 + p.dir_dy;
+        if nx >= 0 && ny >= 0 && (nx as u8) < level.width && (ny as u8) < level.height {
+            let nxu = nx as u8;
+            let nyu = ny as u8;
+            if !matches!(level.tile(nxu, nyu).obstacle, Some(ObstacleKind::Block)) {
+                return Some((nxu, nyu));
+            }
+        }
+        // blocked: drop momentum and fallthrough to normal logic
+    }
+
+    // Prefer moving onto an adjacent JumpPad if present (it will launch the piece)
+    let dirs: [(i8, i8); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+    for (dx, dy) in dirs {
+        let nx = x as i8 + dx;
+        let ny = y as i8 + dy;
+        if nx < 0 || ny < 0 || (nx as u8) >= level.width || (ny as u8) >= level.height {
+            continue;
+        }
+        let tile = level.tile(nx as u8, ny as u8);
+        if let Some(ObstacleKind::JumpPad { .. }) = tile.obstacle {
+            return Some((nx as u8, ny as u8));
+        }
+    }
+
+    // Fallback to greedy nearest-goal step
+    choose_next_step(level, x, y)
 }
 
 fn choose_next_step(level: &LevelDesc, x: u8, y: u8) -> Option<(u8, u8)> {
