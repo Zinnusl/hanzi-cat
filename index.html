@@ -25,6 +25,13 @@
     #hc-instructions-overlay button.close { position:absolute; top:10px; right:14px; background:#222; color:#ffd166; border:1px solid #444; padding:4px 10px; cursor:pointer; border-radius:4px; font-family:'Fira Code', monospace; }
     #hc-instructions-overlay button.close:hover { background:#2c2c2c; }
     #hc-instructions-overlay a { color:#8ab4ff; }
+    /* Cat container (bottom center) */
+    .hc-cat-container { position:fixed; bottom:8px; left:50%; transform:translateX(-50%); width:200px; z-index:15; pointer-events:none; opacity:0.96; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.7)); }
+    .hc-cat-container svg { width:100%; height:auto; display:block; }
+    .hc-cat-eye { animation: hc-blink 6s infinite; transform-origin: center; }
+    @keyframes hc-blink { 0%,4%,6%,100% { transform:scaleY(1); } 5% { transform:scaleY(.12); } }
+    .hc-cat-tail { animation: hc-tail 3.8s ease-in-out infinite; transform-origin: 45px 110px; }
+    @keyframes hc-tail { 0%,100% { transform:rotate(0deg); } 50% { transform:rotate(-12deg); } }
   </style>
 </head>
 <body>
@@ -52,13 +59,43 @@
   <div id="boot" class="loading">Loading Hanzi Cat WASM...</div>
   <!-- Root is created automatically by start_game(), but we can also pre-create -->
   <div id="hanzi-cat-root"></div>
-  <div id="hc-powerups" class="hc-powerups" aria-label="Powerups">
-    <h2>Powerups</h2>
-    <button type="button" data-kind="mult" title="Double score for 10s (cost 1200)">x2 Score (1200)</button>
-    <button type="button" data-kind="slow" title="Slow time 8s (cost 800)">Slow Time (800)</button>
-    <button type="button" data-kind="shield" title="Prevent next miss (cost 600)">Shield (600)</button>
-    <div class="status" id="hc-powerups-status">none active</div>
+  <!-- Decorative cat mascot (board mode) -->
+  <div class="hc-cat-container" aria-hidden="true">
+    <svg viewBox="0 0 200 200" role="img" aria-label="Cat">
+      <defs>
+        <linearGradient id="catGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#0d0d0d"/>
+          <stop offset="100%" stop-color="#020202"/>
+        </linearGradient>
+        <linearGradient id="eyeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#ffe9a6"/>
+          <stop offset="100%" stop-color="#ffd166"/>
+        </linearGradient>
+      </defs>
+      <!-- Tail behind -->
+      <path class="hc-cat-tail" d="M42 128 Q22 120 30 108 Q40 95 54 104 Q44 90 52 78 Q62 64 74 74 Q86 84 82 104 Q78 124 64 132 Z" fill="url(#catGrad)"/>
+      <!-- Body -->
+      <ellipse cx="100" cy="125" rx="60" ry="48" fill="url(#catGrad)"/>
+      <!-- Head -->
+      <circle cx="100" cy="82" r="54" fill="url(#catGrad)"/>
+      <!-- Ears -->
+      <path d="M54 58 L72 28 L80 62 Z" fill="url(#catGrad)"/>
+      <path d="M146 58 L128 28 L120 62 Z" fill="url(#catGrad)"/>
+      <!-- Eyes -->
+      <g class="hc-cat-eye">
+        <ellipse cx="78" cy="82" rx="14" ry="13" fill="url(#eyeGrad)"/>
+        <ellipse cx="122" cy="82" rx="14" ry="13" fill="url(#eyeGrad)"/>
+        <circle cx="78" cy="82" r="5" fill="#1b1b1b"/>
+        <circle cx="122" cy="82" r="5" fill="#1b1b1b"/>
+      </g>
+      <!-- Nose / mouth -->
+      <path d="M96 97 Q100 100 104 97 Q100 101 100 102 Q100 101 96 97 Z" fill="#444"/>
+      <path d="M92 103 Q100 118 108 103 Q108 112 100 120 Q92 112 92 103 Z" fill="#ff5a5a" stroke="#333" stroke-width="2"/>
+      <!-- Chest highlight -->
+      <ellipse cx="100" cy="140" rx="20" ry="12" fill="#111"/>
+    </svg>
   </div>
+<!-- Powerups UI removed -->
 
   <script type="module">
     // Entry module for the game.
