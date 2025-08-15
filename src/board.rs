@@ -178,53 +178,24 @@ struct BoardState {
 
 // --- Static Prototype Level --------------------------------------------------
 
-// Simple 8x8 blank chess-like board with a couple of placeholder obstacles.
+// Level 1: Simple introduction board (9x9), no obstacles or modifiers.
 const LEVEL1_TILES: [TileDesc; 81] = {
-    use ObstacleKind::*;
-    // 9x9 board adaptation (previously 8x8). Keep similar obstacle layout, expanded space.
-    let mut arr: [TileDesc; 81] = [TileDesc {
+    let arr: [TileDesc; 81] = [TileDesc {
         obstacle: None,
         modifier: None,
     }; 81];
-    // Obstacles (coordinates updated for width 9):
-    // Block at (3,0)
-    arr[3] = TileDesc {
-        obstacle: Some(Block),
-        modifier: None,
-    };
-    // Block at (5,4)
-    arr[9 * 4 + 5] = TileDesc {
-        obstacle: Some(Block),
-        modifier: None,
-    };
-    // Teleport at (2,6) -> (8,8) (bottom-right corner in new 9x9)
-    arr[9 * 6 + 2] = TileDesc {
-        obstacle: Some(Teleport { to: (8, 8) }),
-        modifier: None,
-    };
     arr
 };
 
 static LEVEL1: LevelDesc = LevelDesc {
     name: "Opening Board",
-    width: 9,
+    width: 3,
     height: 9,
     bpm: 120.0,
     tiles: &LEVEL1_TILES,
     // All top-row cells are spawn points (requirement: spawn from any top field)
-    spawn_points: &[
-        (0, 0),
-        (1, 0),
-        (2, 0),
-        (3, 0),
-        (4, 0),
-        (5, 0),
-        (6, 0),
-        (7, 0),
-        (8, 0),
-    ],
-    // Goal region: center three bottom cells (3,8),(4,8),(5,8)
-    goal_region: &[(3, 8), (4, 8), (5, 8)],
+    spawn_points: &[(0, 0), (1, 0), (2, 0)],
+    goal_region: &[(1, 8)],
 };
 
 // Level 2: Introduces conveyors, tempo shift and transform tile.
@@ -315,9 +286,64 @@ static LEVEL2: LevelDesc = LevelDesc {
     goal_region: &[(8, 8)],
 };
 
+// Level 3: Complex board with more obstacles and Hanzi
+const LEVEL3_TILES: [TileDesc; 81] = [
+    // y = 0
+    TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Teleport { to: (0, 8) }), modifier: None },
+    // y = 1
+    TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Conveyor { dx: 1, dy: 0 }), modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None },
+    // y = 2
+    TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: None, modifier: None },
+    // y = 3
+    TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None },
+    // y = 4
+    TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: Some(ObstacleKind::TempoShift { mult: 1.5, beats: 3 }), modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None },
+    // y = 5
+    TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Conveyor { dx: -1, dy: 0 }), modifier: None }, TileDesc { obstacle: None, modifier: None },
+    // y = 6
+    TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None }, TileDesc { obstacle: None, modifier: None },
+    // y = 7
+    TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: Some(ObstacleKind::Transform), modifier: Some(ModifierKind::TransformMap { pairs: &[("水", "火"), ("山", "田")] }) }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None },
+    // y = 8
+    TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None }, TileDesc { obstacle: None, modifier: None },
+];
+
+static LEVEL3_HANZI: [(&str, &str); 10] = [
+    ("水", "shui3"),
+    ("火", "huo3"),
+    ("山", "shan1"),
+    ("田", "tian2"),
+    ("风", "feng1"),
+    ("雨", "yu3"),
+    ("日", "ri4"),
+    ("月", "yue4"),
+    ("木", "mu4"),
+    ("石", "shi2"),
+];
+
+static LEVEL3: LevelDesc = LevelDesc {
+    name: "Maze Challenge",
+    width: 9,
+    height: 9,
+    bpm: 132.0,
+    tiles: &LEVEL3_TILES,
+    spawn_points: &[
+        (0, 0),
+        (1, 0),
+        (2, 0),
+        (3, 0),
+        (4, 0),
+        (5, 0),
+        (6, 0),
+        (7, 0),
+        (8, 0),
+    ],
+    goal_region: &[(4, 8), (5, 8), (6, 8)],
+};
+
 // Ordered level sequence & score thresholds for progression (score must be >= threshold to enter level index)
-static LEVELS: [&LevelDesc; 2] = [&LEVEL1, &LEVEL2];
-static LEVEL_SCORE_THRESHOLDS: [i64; 2] = [0, 2500];
+static LEVELS: [&LevelDesc; 3] = [&LEVEL1, &LEVEL2, &LEVEL3];
+static LEVEL_SCORE_THRESHOLDS: [i64; 3] = [0, 2500, 6000];
 
 // --- WASM Entry (board mode) -------------------------------------------------
 
@@ -405,7 +431,7 @@ pub fn start_board_mode() -> Result<(), JsValue> {
 
     // Keyboard listener for pinyin typing
     {
-        use wasm_bindgen::JsCast;
+        
         let closure = Closure::wrap(Box::new(move |evt: web_sys::KeyboardEvent| {
             BOARD_STATE.with(|state_cell| {
                 if let Some(state) = state_cell.borrow_mut().as_mut() {
@@ -594,16 +620,30 @@ fn board_tick(state: &mut BoardState, now: f64) {
                 let mut html = String::new();
                 let filled = (state.lives.max(0).min(max_hearts)) as usize;
                 for _ in 0..filled {
-                    html.push_str("<span style='color:#ff4d4d;font-size:16px;margin-right:6px;'>♥</span>");
+                    html.push_str(
+                        "<span style='color:#ff4d4d;font-size:16px;margin-right:6px;'>♥</span>",
+                    );
                 }
                 for _ in filled..(max_hearts as usize) {
-                    html.push_str("<span style='color:#6b6b6b;font-size:16px;margin-right:6px;'>♡</span>");
+                    html.push_str(
+                        "<span style='color:#6b6b6b;font-size:16px;margin-right:6px;'>♡</span>",
+                    );
                 }
                 lives_el.set_inner_html(&html);
             }
         }
     }
 }
+
+// Hanzi and pinyin for LEVEL2
+static LEVEL2_HANZI: [(&str, &str); 6] = [
+    ("你", "ni3"),
+    ("好", "hao3"),
+    ("天", "tian1"),
+    ("气", "qi4"),
+    ("中", "zhong1"),
+    ("国", "guo2"),
+];
 
 fn on_new_beat(state: &mut BoardState, beat_idx: i64, now: f64) {
     // Base hop duration (one half-beat @ 120 BPM ~= 250ms, scaled by hop_time_factor)
@@ -615,7 +655,14 @@ fn on_new_beat(state: &mut BoardState, beat_idx: i64, now: f64) {
         if !state.level.spawn_points.is_empty() {
             let idx = rand_index(state.level.spawn_points.len());
             let (sx, sy) = state.level.spawn_points[idx];
-            let piece = Piece::new("你", "ni3", sx, sy, now, base_hop_ms);
+            // For LEVEL2, spawn random Hanzi from LEVEL2_HANZI
+            let (hanzi, pinyin) = if state.level.name == "Conveyor Crossing" {
+                let hidx = rand_index(LEVEL2_HANZI.len());
+                LEVEL2_HANZI[hidx]
+            } else {
+                ("你", "ni3")
+            };
+            let piece = Piece::new(hanzi, pinyin, sx, sy, now, base_hop_ms);
             state.pieces.push(piece);
         }
     }
