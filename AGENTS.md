@@ -133,6 +133,8 @@ Agents may append items here with justification:
 
 - Added native integration tests: created `tests/integration.rs` asserting `purchase_powerup` returns false and a small dataset sanity check; created `tests/` directory.
 
+- Added dataset integration tests: created `tests/datasets.rs` to validate SINGLE_HANZI and MULTI_HANZI invariants (uniqueness, pinyin format, no exact pinyin overlap). Ran `cargo test` — all native tests passed.
+
 ---
 This document is a living reference for agents. Update responsibly and keep it tightly aligned with actual repository state.
 
