@@ -134,3 +134,5 @@ Agents may append items here with justification:
 ---
 This document is a living reference for agents. Update responsibly and keep it tightly aligned with actual repository state.
 
+- Recent agent edits (automated): Applied focused Clippy-oriented cleanups to src/board/*: collapsed a nested keyboard handler if; removed unnecessary parentheses around beat-phase math; introduced a FrameCallback type alias; added a documented #[allow(clippy::missing_const_for_thread_local)] above BOARD_STATE as a minimal mitigation; updated TODO statuses (todo-25, todo-26, todo-27) and committed the changes.
+

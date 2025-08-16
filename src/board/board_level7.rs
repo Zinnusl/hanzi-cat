@@ -36,15 +36,15 @@ pub fn level7() -> &'static LevelDesc {
         tiles_vec[idx].obstacle = Some(ObstacleKind::Block);
     }
     // Add a conveyor on row 1 pushing right
-    tiles_vec[1usize * width as usize + 3usize].obstacle = Some(ObstacleKind::Conveyor { dx: 1, dy: 0 });
-    tiles_vec[1usize * width as usize + 4usize].obstacle = Some(ObstacleKind::Conveyor { dx: 1, dy: 0 });
-    tiles_vec[1usize * width as usize + 5usize].obstacle = Some(ObstacleKind::Conveyor { dx: 1, dy: 0 });
+    tiles_vec[width as usize + 3].obstacle = Some(ObstacleKind::Conveyor { dx: 1, dy: 0 });
+    tiles_vec[width as usize + 4].obstacle = Some(ObstacleKind::Conveyor { dx: 1, dy: 0 });
+    tiles_vec[width as usize + 5].obstacle = Some(ObstacleKind::Conveyor { dx: 1, dy: 0 });
 
     // Add a tempo shift tile near center
-    tiles_vec[4usize * width as usize + 4usize].obstacle = Some(ObstacleKind::TempoShift { mult: 1.5, beats: 6 });
+    tiles_vec[4 * width as usize + 4].obstacle = Some(ObstacleKind::TempoShift { mult: 1.5, beats: 6 });
 
     // Modifier: score multiplier tile near goal
-    tiles_vec[6usize * width as usize + 6usize].modifier = Some(ModifierKind::ScoreMult { factor: 2.0, beats: 6 });
+    tiles_vec[6 * width as usize + 6].modifier = Some(ModifierKind::ScoreMult { factor: 2.0, beats: 6 });
 
     let tiles: &'static [TileDesc] = Box::leak(tiles_vec.into_boxed_slice());
     let spawn_points: &'static [(u8, u8)] = Box::leak(vec![(0u8, 0u8), (9u8, 0u8), (5u8, 0u8)].into_boxed_slice());

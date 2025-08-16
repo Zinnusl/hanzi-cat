@@ -14,10 +14,9 @@
 //!
 //! This file currently focuses on data structures + a minimal ticking harness so we
 //! can implement gameplay incrementally.
-
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, window, HtmlElement};
+use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, window};
 
 // --- Core Time / Beat Model -------------------------------------------------
 
@@ -47,6 +46,7 @@ impl BeatClock {
 // --- Board / Tiles / Obstacles / Modifiers ----------------------------------
 
 /// Kinds of obstacles that occupy or affect tiles.
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
 pub enum ObstacleKind {
     Block,                                // Cannot enter
@@ -64,6 +64,7 @@ pub enum ObstacleKind {
 }
 
 /// Tile modifiers (non-exclusive with some obstacles) that adjust piece / hanzi logic.
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
 pub enum ModifierKind {
     ScoreMult {
@@ -87,6 +88,7 @@ pub struct TileDesc {
 }
 
 /// Level grid descriptor (immutable). We use a flat vector row-major.
+#[allow(dead_code)]
 pub struct LevelDesc {
     pub name: &'static str,
     pub width: u8,
@@ -107,6 +109,7 @@ impl LevelDesc {
 /// Active piece on the board (represents a Hanzi / word). For now only one piece hops;
 /// future: multiple simultaneous streams. Pieces now carry a small notion of direction
 /// and short-lived momentum so tiles like Ice and JumpPad can influence motion.
+#[allow(dead_code)]
 struct Piece {
     hanzi: &'static str,
     pinyin: &'static str,
@@ -125,6 +128,7 @@ struct Piece {
     momentum: u8,
 }
 
+#[allow(dead_code)]
 impl Piece {
     fn begin_hop(&mut self, to_x: u8, to_y: u8, now: f64, duration_ms: f64) {
         // Record normalized direction so tile effects (ice / conveyors) can
@@ -145,6 +149,7 @@ impl Piece {
     }
 }
 
+#[allow(dead_code)]
 impl Piece {
     fn new(
         hanzi: &'static str,
@@ -238,7 +243,7 @@ pub use board_level7::LEVEL7_HANZI;
 fn levels() -> &'static [&'static LevelDesc] {
     use std::sync::OnceLock;
     static LEVELS_STATIC: OnceLock<&'static [&'static LevelDesc]> = OnceLock::new();
-    *LEVELS_STATIC.get_or_init(|| {
+    LEVELS_STATIC.get_or_init(|| {
         let l1 = board_level1::level1();
         let l2 = board_level2::level2();
         let l3: &'static LevelDesc = &board_level3::LEVEL3;
@@ -331,13 +336,13 @@ pub fn start_board_mode() -> Result<(), JsValue> {
         cat_x: {
             let lvl = levels()[0];
             let mut cx = lvl.width / 2;
-            let mut cy = lvl.height / 2;
-            if matches!(lvl.tile(cx, cy).obstacle, Some(ObstacleKind::Block)) {
-                'search_free: for yy in 0..lvl.height {
-                    for xx in 0..lvl.width {
-                        if !matches!(lvl.tile(xx, yy).obstacle, Some(ObstacleKind::Block)) {
-                            cx = xx;
-                            cy = yy;
+                    let mut _cy = lvl.height / 2;
+                    if matches!(lvl.tile(cx, _cy).obstacle, Some(ObstacleKind::Block)) {
+                        'search_free: for yy in 0..lvl.height {
+                            for xx in 0..lvl.width {
+                                if !matches!(lvl.tile(xx, yy).obstacle, Some(ObstacleKind::Block)) {
+                                    cx = xx;
+                                    _cy = yy;
                             break 'search_free;
                         }
                     }
@@ -347,13 +352,13 @@ pub fn start_board_mode() -> Result<(), JsValue> {
         },
         cat_y: {
             let lvl = levels()[0];
-            let mut cx = lvl.width / 2;
-            let mut cy = lvl.height / 2;
-            if matches!(lvl.tile(cx, cy).obstacle, Some(ObstacleKind::Block)) {
-                'search_free2: for yy in 0..lvl.height {
-                    for xx in 0..lvl.width {
-                        if !matches!(lvl.tile(xx, yy).obstacle, Some(ObstacleKind::Block)) {
-                            cx = xx;
+                    let mut _cx = lvl.width / 2;
+                    let mut cy = lvl.height / 2;
+                    if matches!(lvl.tile(_cx, cy).obstacle, Some(ObstacleKind::Block)) {
+                        'search_free2: for yy in 0..lvl.height {
+                            for xx in 0..lvl.width {
+                                if !matches!(lvl.tile(xx, yy).obstacle, Some(ObstacleKind::Block)) {
+                                    _cx = xx;
                             cy = yy;
                             break 'search_free2;
                         }
@@ -512,11 +517,9 @@ pub fn start_board_mode() -> Result<(), JsValue> {
                         }
                     }
                     // Update DOM element
-                    if let Some(win) = window() {
-                        if let Some(doc) = win.document() {
-                            if let Some(el) = doc.get_element_by_id("hc-typing") {
-                                el.set_text_content(Some(&state.typing));
-                            }
+                    if let Some(doc) = window().and_then(|w| w.document()) {
+                        if let Some(el) = doc.get_element_by_id("hc-typing") {
+                            el.set_text_content(Some(&state.typing));
                         }
                     }
                 }
@@ -575,14 +578,17 @@ pub fn start_board_mode() -> Result<(), JsValue> {
     Ok(())
 }
 
-thread_local! {
-    static BOARD_STATE: std::cell::RefCell<Option<BoardState>> = std::cell::RefCell::new(None);
-}
+ // RefCell::new isn't const on this toolchain; allow Clippy lint until a const initializer is feasible.
+ #[allow(clippy::missing_const_for_thread_local)]
+ thread_local! {
+     static BOARD_STATE: std::cell::RefCell<Option<BoardState>> = std::cell::RefCell::new(None);
+ }
+
+type FrameCallback = std::rc::Rc<std::cell::RefCell<Option<Closure<dyn FnMut(f64)>>>>;
 
 fn start_board_loop() {
     use wasm_bindgen::JsCast;
-    let f: std::rc::Rc<std::cell::RefCell<Option<Closure<dyn FnMut(f64)>>>> =
-        std::rc::Rc::new(std::cell::RefCell::new(None));
+    let f: FrameCallback = std::rc::Rc::new(std::cell::RefCell::new(None));
     let g = f.clone();
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move |ts: f64| {
         BOARD_STATE.with(|state_cell| {
@@ -698,7 +704,7 @@ fn render_board(state: &mut BoardState, now: f64) {
     // Render background with a subtle beat pulse.
     let beat_phase = {
         let cb = state.beat.current_beat(now);
-        (cb - cb.floor()) as f64
+        cb - cb.floor()
     };
     let pulse = ((beat_phase * std::f64::consts::TAU).sin() * 0.5 + 0.5) * 0.25;
     let cell_w = state.canvas.width() as f64 / state.level.width as f64;
@@ -1076,6 +1082,7 @@ fn draw_obstacle(
     }
 }
 
+#[allow(dead_code)]
 fn apply_tile_effects(piece: &mut Piece, state: &mut BoardState, current_beat: i64, _now: f64) {
     let tile = state.level.tile(piece.x, piece.y);
     // Obstacles with post-arrival effects
@@ -1196,7 +1203,7 @@ fn check_level_progression(state: &mut BoardState, now: f64, current_beat: i64) 
     }
 }
 
-fn set_level(state: &mut BoardState, new_index: usize, now: f64, current_beat: i64) {
+fn set_level(state: &mut BoardState, new_index: usize, now: f64, _current_beat: i64) {
     // Switch to the new level descriptor and reinitialize dynamic per-level state.
     state.level_index = new_index;
     state.level = levels()[new_index];
@@ -1306,6 +1313,7 @@ fn pick_random_hanzi(level: &LevelDesc) -> (&'static str, &'static str) {
 
 /// Decide next step for a piece taking into account momentum (ice), jump pads, and
 /// simple heuristics. Returns the next tile to hop to if any.
+#[allow(dead_code)]
 fn choose_next_for_piece(level: &LevelDesc, p: &Piece) -> Option<(u8, u8)> {
     let x = p.x;
     let y = p.y;
@@ -1342,6 +1350,7 @@ fn choose_next_for_piece(level: &LevelDesc, p: &Piece) -> Option<(u8, u8)> {
     choose_next_step(level, x, y)
 }
 
+#[allow(dead_code)]
 fn choose_next_step(level: &LevelDesc, x: u8, y: u8) -> Option<(u8, u8)> {
     // Greedy: pick neighbor (4-dir) that reduces Manhattan distance to ANY goal tile and is not blocked.
     let dirs: [(i8, i8); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];

@@ -12,7 +12,7 @@ fn build_level1_tiles() -> &'static [TileDesc] {
 pub fn level1() -> &'static LevelDesc {
     static LD: OnceLock<LevelDesc> = OnceLock::new();
     static TILES: OnceLock<&'static [TileDesc]> = OnceLock::new();
-    let tiles = TILES.get_or_init(|| build_level1_tiles());
+    let tiles = TILES.get_or_init(build_level1_tiles);
     LD.get_or_init(|| LevelDesc {
         name: "Opening Board",
         width: 3,
