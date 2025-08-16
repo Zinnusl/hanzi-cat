@@ -13,8 +13,8 @@ fn build_level2_tiles() -> &'static [TileDesc] {
     arr[9 * 3 + 5] = TileDesc { obstacle: Some(Block), modifier: None };
     arr[9 * 3 + 6] = TileDesc { obstacle: Some(Block), modifier: None };
     arr[9 * 3 + 7] = TileDesc { obstacle: Some(Block), modifier: None };
-    arr[9 * 0 + 2] = TileDesc { obstacle: Some(Conveyor { dx: 0, dy: 1 }), modifier: None };
-    arr[9 * 1 + 2] = TileDesc { obstacle: Some(Conveyor { dx: 0, dy: 1 }), modifier: None };
+    arr[2] = TileDesc { obstacle: Some(Conveyor { dx: 0, dy: 1 }), modifier: None };
+    arr[9 + 2] = TileDesc { obstacle: Some(Conveyor { dx: 0, dy: 1 }), modifier: None };
     arr[9 * 2 + 2] = TileDesc { obstacle: Some(Conveyor { dx: 0, dy: 1 }), modifier: None };
     arr[9 * 5 + 5] = TileDesc { obstacle: Some(TempoShift { mult: 1.35, beats: 4 }), modifier: None };
     arr[9 * 6 + 6] = TileDesc { obstacle: Some(Transform), modifier: Some(ModifierKind::TransformMap { pairs: &[ ("你", "好") ] }) };
@@ -24,7 +24,7 @@ fn build_level2_tiles() -> &'static [TileDesc] {
 pub fn level2() -> &'static LevelDesc {
     static LD: OnceLock<LevelDesc> = OnceLock::new();
     static TILES: OnceLock<&'static [TileDesc]> = OnceLock::new();
-    let tiles = TILES.get_or_init(|| build_level2_tiles());
+    let tiles = TILES.get_or_init(build_level2_tiles);
     LD.get_or_init(|| LevelDesc {
         name: "Conveyor Crossing",
         width: 9,

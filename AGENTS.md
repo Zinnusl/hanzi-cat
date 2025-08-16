@@ -140,6 +140,4 @@ This document is a living reference for agents. Update responsibly and keep it t
 - Implementation details: pick_random_hanzi now samples from SINGLE_HANZI with fallback to ("你","ni3"); update_pieces now consumes the landing tile on hop finish and, for level 0, repopulates up-to-8 neighbor tiles with unique entries drawn from SINGLE_HANZI and parity-fills remaining non-block tiles.
 - Build: Ran `cargo build --verbose`; compilation completed successfully with warnings (20 warnings).
 - Task tracking: Marked todos t18-3 and t18-4 as done.
-
-This document is a living reference for agents. Update responsibly and keep it tightly aligned with actual repository state.
-
+- Recent agent edits (automated): Applied focused Clippy-oriented cleanups to src/board/*: collapsed a nested keyboard handler if; removed unnecessary parentheses around beat-phase math; introduced a FrameCallback type alias; added a documented #[allow(clippy::missing_const_for_thread_local)] above BOARD_STATE as a minimal mitigation; updated TODO statuses (todo-25, todo-26, todo-27) and committed the changes.

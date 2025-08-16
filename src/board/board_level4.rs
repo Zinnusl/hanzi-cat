@@ -28,7 +28,7 @@ fn build_level4_tiles() -> &'static [TileDesc] {
     }
     for y in (0..9).step_by(2) {
         for x in 0..7 {
-            if matches!(arr[7 * y + x].obstacle, None) {
+            if arr[7 * y + x].obstacle.is_none() {
                 arr[7 * y + x].obstacle = Some(Conveyor { dx: 1, dy: 0 });
             }
         }
@@ -51,7 +51,7 @@ fn build_level4_tiles() -> &'static [TileDesc] {
 pub fn level4() -> &'static LevelDesc {
     static LD: OnceLock<LevelDesc> = OnceLock::new();
     static TILES: OnceLock<&'static [TileDesc]> = OnceLock::new();
-    let tiles = TILES.get_or_init(|| build_level4_tiles());
+    let tiles = TILES.get_or_init(build_level4_tiles);
     LD.get_or_init(|| LevelDesc {
         name: "Zigzag Express",
         width: 7,

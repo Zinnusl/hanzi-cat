@@ -19,9 +19,9 @@ fn build_level5_tiles() -> &'static [TileDesc] {
     use ObstacleKind::*;
     let mut arr: Vec<TileDesc> = vec![TileDesc { obstacle: None, modifier: None }; 81];
     for i in 0..9 {
-        arr[9 * 0 + i] = TileDesc { obstacle: Some(Block), modifier: None };
+        arr[i] = TileDesc { obstacle: Some(Block), modifier: None };
         arr[9 * 8 + i] = TileDesc { obstacle: Some(Block), modifier: None };
-        arr[9 * i + 0] = TileDesc { obstacle: Some(Block), modifier: None };
+        arr[9 * i] = TileDesc { obstacle: Some(Block), modifier: None };
         arr[9 * i + 8] = TileDesc { obstacle: Some(Block), modifier: None };
     }
     for i in 2..7 {
@@ -34,20 +34,20 @@ fn build_level5_tiles() -> &'static [TileDesc] {
         arr[9 * 4 + i] = TileDesc { obstacle: Some(Block), modifier: None };
         arr[9 * i + 4] = TileDesc { obstacle: Some(Block), modifier: None };
     }
-    arr[9 * 1 + 7] = TileDesc { obstacle: Some(Teleport { to: (7, 1) }), modifier: None };
-    arr[9 * 7 + 1] = TileDesc { obstacle: Some(Teleport { to: (1, 7) }), modifier: None };
-    arr[9 * 3 + 5] = TileDesc { obstacle: Some(Conveyor { dx: 0, dy: 1 }), modifier: None };
-    arr[9 * 5 + 3] = TileDesc { obstacle: Some(Conveyor { dx: 1, dy: 0 }), modifier: None };
-    arr[9 * 1 + 1] = TileDesc { obstacle: None, modifier: Some(ModifierKind::ScoreMult { factor: 2.0, beats: 4 }) };
-    arr[9 * 7 + 7] = TileDesc { obstacle: None, modifier: Some(ModifierKind::SlowHop { factor: 1.5, beats: 3 }) };
-    arr[9 * 4 + 4] = TileDesc { obstacle: Some(Transform), modifier: Some(ModifierKind::TransformMap { pairs: &[ ("梦", "星"), ("光", "影") ] }) };
+    arr[16] = TileDesc { obstacle: Some(Teleport { to: (7, 1) }), modifier: None };
+    arr[64] = TileDesc { obstacle: Some(Teleport { to: (1, 7) }), modifier: None };
+    arr[32] = TileDesc { obstacle: Some(Conveyor { dx: 0, dy: 1 }), modifier: None };
+    arr[48] = TileDesc { obstacle: Some(Conveyor { dx: 1, dy: 0 }), modifier: None };
+    arr[10] = TileDesc { obstacle: None, modifier: Some(ModifierKind::ScoreMult { factor: 2.0, beats: 4 }) };
+    arr[70] = TileDesc { obstacle: None, modifier: Some(ModifierKind::SlowHop { factor: 1.5, beats: 3 }) };
+    arr[40] = TileDesc { obstacle: Some(Transform), modifier: Some(ModifierKind::TransformMap { pairs: &[ ("梦", "星"), ("光", "影") ] }) };
     Box::leak(arr.into_boxed_slice())
 }
 
 pub fn level5() -> &'static LevelDesc {
     static LD: OnceLock<LevelDesc> = OnceLock::new();
     static TILES: OnceLock<&'static [TileDesc]> = OnceLock::new();
-    let tiles = TILES.get_or_init(|| build_level5_tiles());
+    let tiles = TILES.get_or_init(build_level5_tiles);
     LD.get_or_init(|| LevelDesc {
         name: "Spiral Dream",
         width: 9,
