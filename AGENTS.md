@@ -131,8 +131,6 @@ Agents may append items here with justification:
 
 - Cat sizing fix: Adjusted DOM #hc-cat SVG sizing so it fits within a single grid cell. The runtime now computes a square cat_size from the smaller of cell_w and cell_h (scaled by a padding factor) and sets inline width/height on #hc-cat each frame to prevent overflow across board sizes; cargo build verified (warnings only). Visual runtime verification recommended to confirm consistent fit and appearance across levels.
 
-- Board neighbor & player-tile update: When initializing level 0 (and when set_level runs), the player's tile is cleared (left empty). Up-to-8 surrounding tiles are populated with distinct hanzi drawn from the single-hanzi pool to guarantee unique adjacent characters for early gameplay; the remainder of the board is filled using an alternating two-character parity pattern. Implementation: src/board/mod.rs (grid prefill and set_level adjustments).
-
 ---
 This document is a living reference for agents. Update responsibly and keep it tightly aligned with actual repository state.
 
@@ -141,3 +139,6 @@ This document is a living reference for agents. Update responsibly and keep it t
 - Build: Ran `cargo build --verbose`; compilation completed successfully with warnings (20 warnings).
 - Task tracking: Marked todos t18-3 and t18-4 as done.
 - Recent agent edits (automated): Applied focused Clippy-oriented cleanups to src/board/*: collapsed a nested keyboard handler if; removed unnecessary parentheses around beat-phase math; introduced a FrameCallback type alias; added a documented #[allow(clippy::missing_const_for_thread_local)] above BOARD_STATE as a minimal mitigation; updated TODO statuses (todo-25, todo-26, todo-27) and committed the changes.
+- Board neighbor & player-tile update: When initializing level 0 (and when set_level runs), the player's tile is cleared (left empty). Up-to-8 surrounding tiles are populated with distinct hanzi drawn from the single-hanzi pool to guarantee unique adjacent characters for early gameplay; the remainder of the board is filled using an alternating two-character parity pattern. Implementation: src/board/mod.rs (grid prefill and set_level adjustments).
+- Added native integration tests: created `tests/integration.rs` asserting `purchase_powerup` returns false and a small dataset sanity check; created `tests/` directory.
+- Added dataset integration tests: created `tests/datasets.rs` to validate SINGLE_HANZI and MULTI_HANZI invariants (uniqueness, pinyin format, no exact pinyin overlap). Ran `cargo test` — all native tests passed.

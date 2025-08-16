@@ -1673,3 +1673,71 @@ fn line(ctx: &CanvasRenderingContext2d, x1: f64, y1: f64, x2: f64, y2: f64) {
     ctx.line_to(x2, y2);
     ctx.stroke();
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Helper to build a simple LevelDesc with optional blocked tiles and leaked static slices
+    fn make_level_with_tiles(
+        width: u8,
+        height: u8,
+        obstacle_positions: &[(u8, u8)],
+        goals: &[(u8, u8)],
+    ) -> LevelDesc {
+        let mut tiles_vec = vec![TileDesc { obstacle: None, modifier: None }; (width as usize * height as usize)];
+        for &(ox, oy) in obstacle_positions.iter() {
+            let idx = oy as usize * width as usize + ox as usize;
+            tiles_vec[idx] = TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None };
+        }
+        let tiles_static: &'static [TileDesc] = Box::leak(tiles_vec.into_boxed_slice());
+        let spawn_static: &'static [(u8, u8)] = Box::leak(vec![(0u8, 0u8)].into_boxed_slice());
+        let goal_static: &'static [(u8, u8)] = Box::leak(goals.to_vec().into_boxed_slice());
+        LevelDesc {
+            name: "test-level",
+            width,
+            height,
+            bpm: 120.0,
+            tiles: tiles_static,
+            spawn_points: spawn_static,
+            goal_region: goal_static,
+        }
+    }
+
+    #[test]
+    fn test_beatclock() {
+        let start = 1_000.0;
+        let clock = BeatClock::new(120.0, start);
+        assert!((clock.beat_duration_ms() - 500.0).abs() < 1e-6);
+        assert!((clock.current_beat(start) - 0.0).abs() < 1e-9);
+        assert!((clock.current_beat(start + 500.0) - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_level_tile_access() {
+        let lvl = make_level_with_tiles(2, 2, &[], &[(1, 1)]);
+        let t = lvl.tile(1, 0);
+        assert!(t.obstacle.is_none());
+        let g = lvl.tile(1, 1);
+        assert!(g.obstacle.is_none());
+    }
+
+    #[test]
+    fn test_choose_next_step_prefers_unblocked_direction() {
+        // Create 3x3 level with (1,0) blocked so (0,0) should move down to (0,1)
+        let lvl = make_level_with_tiles(3, 3, &[(1, 0)], &[(2, 2)]);
+        let step = choose_next_step(&lvl, 0, 0);
+        assert_eq!(step, Some((0, 1)));
+    }
+
+    #[test]
+    fn test_choose_next_for_piece_momentum() {
+        let lvl = make_level_with_tiles(3, 3, &[], &[(2, 2)]);
+        let mut p = Piece::new("你", "ni3", 1, 1, 0.0, 200.0);
+        p.dir_dx = 1;
+        p.dir_dy = 0;
+        p.momentum = 1;
+        let next = choose_next_for_piece(&lvl, &p);
+        assert_eq!(next, Some((2, 1)));
+    }
+}
