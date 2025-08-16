@@ -131,6 +131,8 @@ Agents may append items here with justification:
 
 - Cat sizing fix: Adjusted DOM #hc-cat SVG sizing so it fits within a single grid cell. The runtime now computes a square cat_size from the smaller of cell_w and cell_h (scaled by a padding factor) and sets inline width/height on #hc-cat each frame to prevent overflow across board sizes; cargo build verified (warnings only). Visual runtime verification recommended to confirm consistent fit and appearance across levels.
 
+- Added native integration tests: created `tests/integration.rs` asserting `purchase_powerup` returns false and a small dataset sanity check; created `tests/` directory.
+
 ---
 This document is a living reference for agents. Update responsibly and keep it tightly aligned with actual repository state.
 
