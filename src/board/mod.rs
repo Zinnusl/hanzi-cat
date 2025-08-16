@@ -16,7 +16,8 @@
 //! can implement gameplay incrementally.
 
 use wasm_bindgen::prelude::*;
-use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, window};
+use wasm_bindgen::JsCast;
+use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, window, HtmlElement};
 
 // --- Core Time / Beat Model -------------------------------------------------
 
@@ -186,6 +187,14 @@ struct BoardState {
     grid: Vec<Option<(&'static str, &'static str)>>,
     cat_x: u8,
     cat_y: u8,
+    // Hop animation (cat reuse) - when true, interpolate between from and target
+    cat_from_x: u8,
+    cat_from_y: u8,
+    cat_target_x: u8,
+    cat_target_y: u8,
+    cat_hop_start_ms: f64,
+    cat_hop_duration_ms: f64,
+    cat_hopping: bool,
     level_index: usize,
     // --- Dynamic state for modifiers ---
     score: i64,
@@ -271,7 +280,7 @@ pub fn start_board_mode() -> Result<(), JsValue> {
     ctx.set_text_align("center");
 
     let now = win.performance().unwrap().now();
-    let board = BoardState {
+    let mut board = BoardState {
         canvas: canvas.clone(),
         ctx: ctx.clone(),
         level: levels()[0],
@@ -353,6 +362,13 @@ pub fn start_board_mode() -> Result<(), JsValue> {
             }
             cy
         },
+        cat_from_x: 0,
+        cat_from_y: 0,
+        cat_target_x: 0,
+        cat_target_y: 0,
+        cat_hop_start_ms: now,
+        cat_hop_duration_ms: 220.0,
+        cat_hopping: false,
         level_index: 0,
         score: 0,
         score_multiplier: 1.0,
@@ -366,6 +382,15 @@ pub fn start_board_mode() -> Result<(), JsValue> {
         slash_effects: Vec::new(),
         hover_tile: None,
     };
+
+    // Initialize cat hop fields to current cat position
+    board.cat_from_x = board.cat_x;
+    board.cat_from_y = board.cat_y;
+    board.cat_target_x = board.cat_x;
+    board.cat_target_y = board.cat_y;
+    board.cat_hop_start_ms = now;
+    board.cat_hop_duration_ms = 220.0;
+    board.cat_hopping = false;
 
     BOARD_STATE.with(|b| b.replace(Some(board)));
 
@@ -442,17 +467,26 @@ pub fn start_board_mode() -> Result<(), JsValue> {
                                 }
                             }
                             if let Some(((mx, my), gidx)) = found {
-                                // Move cat into tile and consume it
-                                state.cat_x = mx;
-                                state.cat_y = my;
-                                state.grid[gidx] = None;
-                                // Score and visual effect
-                                let per = (180.0 * state.score_multiplier) as i64;
-                                state.score += per;
+                                // Queue a hop animation (reuse canonical cat) instead of
+                                // instant teleport. We'll still consume the tile and
+                                // award score immediately; the visual hop will play out.
                                 let now_ts = window()
                                     .and_then(|w| w.performance())
                                     .map(|p| p.now())
                                     .unwrap_or(0.0);
+
+                                state.cat_from_x = state.cat_x;
+                                state.cat_from_y = state.cat_y;
+                                state.cat_target_x = mx;
+                                state.cat_target_y = my;
+                                state.cat_hop_start_ms = now_ts;
+                                state.cat_hop_duration_ms = 220.0 * state.hop_time_factor;
+                                state.cat_hopping = true;
+
+                                // Consume tile and award score immediately (visual slash plays)
+                                state.grid[gidx] = None;
+                                let per = (180.0 * state.score_multiplier) as i64;
+                                state.score += per;
                                 state.slash_effects.push(SlashEffect {
                                     x: mx,
                                     y: my,
@@ -640,12 +674,24 @@ fn on_new_beat(state: &mut BoardState, _beat_idx: i64, _now: f64) {
     // Future: consider refilling only a subset per beat to tune pacing.
 }
 
-fn update_pieces(_state: &mut BoardState, _now: f64, _whole_beat: i64) {
-    // No-op: moving-piece logic removed in favor of a static grid + player-controlled
-    // cat. Tile lifecycle (spawn/refill) is handled in on_new_beat and player
-    // actions manipulate state.grid directly. Keeping this function as a no-op
-    // preserves the existing call site in board_tick while removing references
-    // to the old `pieces` collection.
+fn update_pieces(state: &mut BoardState, now: f64, _whole_beat: i64) {
+    // Advance cat hop animation (if any). We keep this function to preserve the
+    // previous call site but now use it to finish the hop and update canonical
+    // cat coordinates when the animation completes.
+    if state.cat_hopping {
+        let elapsed = now - state.cat_hop_start_ms;
+        let dur = if state.cat_hop_duration_ms <= 0.0 {
+            1.0
+        } else {
+            state.cat_hop_duration_ms
+        };
+        let t = (elapsed / dur).clamp(0.0, 1.0);
+        if t >= 1.0 {
+            state.cat_hopping = false;
+            state.cat_x = state.cat_target_x;
+            state.cat_y = state.cat_target_y;
+        }
+    }
 }
 
 fn render_board(state: &mut BoardState, now: f64) {
@@ -745,47 +791,62 @@ fn render_board(state: &mut BoardState, now: f64) {
     state.ctx.set_shadow_offset_x(0.0);
     state.ctx.set_shadow_offset_y(0.0);
 
-    // Draw the cat at its tile (simple circular cat head + ears + eyes)
-    let cat_cx = state.cat_x as f64 * cell_w + cell_w / 2.0;
-    let cat_cy = state.cat_y as f64 * cell_h + cell_h / 2.0;
+    // Compute the cat center (as before) and position the canonical DOM SVG (#hc-cat)
+    // over the canvas. We preserve the SVG's internal animation by moving the element
+    // instead of rasterizing it to the canvas.
+    let (cat_cx, cat_cy) = if state.cat_hopping {
+        let elapsed = now - state.cat_hop_start_ms;
+        let dur = if state.cat_hop_duration_ms <= 0.0 {
+            1.0
+        } else {
+            state.cat_hop_duration_ms
+        };
+        let t = (elapsed / dur).clamp(0.0, 1.0);
+        // ease-in-out-ish (simple quadratic ease)
+        let ease_t = 1.0 - (1.0 - t).powf(2.0);
+        let from_x = state.cat_from_x as f64;
+        let from_y = state.cat_from_y as f64;
+        let to_x = state.cat_target_x as f64;
+        let to_y = state.cat_target_y as f64;
+        let ix = from_x + (to_x - from_x) * ease_t;
+        let iy = from_y + (to_y - from_y) * ease_t;
+        // vertical arc for hop
+        let hop_h = (t * std::f64::consts::PI).sin() * 0.20 * cell_h;
+        (ix * cell_w + cell_w / 2.0, iy * cell_h + cell_h / 2.0 - hop_h)
+    } else {
+        (state.cat_x as f64 * cell_w + cell_w / 2.0, state.cat_y as f64 * cell_h + cell_h / 2.0)
+    };
 
-    // Body / head
-    state.ctx.set_fill_style_str("#ffd166");
-    state.ctx.begin_path();
-    state.ctx.arc(cat_cx, cat_cy - cell_h * 0.08, cell_h * 0.22, 0.0, std::f64::consts::TAU).ok();
-    state.ctx.fill();
-
-    // Ears
-    state.ctx.set_fill_style_str("#ffb703");
-    state.ctx.begin_path();
-    state.ctx.move_to(cat_cx - cell_w * 0.12, cat_cy - cell_h * 0.28);
-    state.ctx.line_to(cat_cx - cell_w * 0.04, cat_cy - cell_h * 0.20);
-    state.ctx.line_to(cat_cx - cell_w * 0.04, cat_cy - cell_h * 0.28);
-    state.ctx.close_path();
-    state.ctx.fill();
-    state.ctx.begin_path();
-    state.ctx.move_to(cat_cx + cell_w * 0.12, cat_cy - cell_h * 0.28);
-    state.ctx.line_to(cat_cx + cell_w * 0.04, cat_cy - cell_h * 0.20);
-    state.ctx.line_to(cat_cx + cell_w * 0.04, cat_cy - cell_h * 0.28);
-    state.ctx.close_path();
-    state.ctx.fill();
-
-    // Eyes
-    state.ctx.set_fill_style_str("#000000");
-    state.ctx.begin_path();
-    state.ctx.arc(cat_cx - cell_w * 0.06, cat_cy - cell_h * 0.06, cell_h * 0.03, 0.0, std::f64::consts::TAU).ok();
-    state.ctx.fill();
-    state.ctx.begin_path();
-    state.ctx.arc(cat_cx + cell_w * 0.06, cat_cy - cell_h * 0.06, cell_h * 0.03, 0.0, std::f64::consts::TAU).ok();
-    state.ctx.fill();
-
-    // Mouth line
-    state.ctx.set_stroke_style_str("#cc4b37");
-    state.ctx.set_line_width(2.0);
-    state.ctx.begin_path();
-    state.ctx.move_to(cat_cx - cell_w * 0.03, cat_cy + cell_h * 0.02);
-    state.ctx.line_to(cat_cx + cell_w * 0.03, cat_cy + cell_h * 0.02);
-    state.ctx.stroke();
+    // Position the DOM cat SVG (#hc-cat) over the canvas at the computed tile center.
+    // The canvas is positioned using fixed left/top + transform:translate(-50%,-50%).
+    // We'll place the cat with the same anchor and apply pixel offsets relative to
+    // the canvas center to avoid requiring additional web-sys features.
+    if let Some(win) = window() {
+        if let Some(doc) = win.document() {
+            if let Some(el) = doc.get_element_by_id("hc-cat") {
+                let canvas_w = state.canvas.width() as f64;
+                let canvas_h = state.canvas.height() as f64;
+                // offset from canvas center in canvas pixels
+                let offset_x = cat_cx - (canvas_w / 2.0);
+                let offset_y = cat_cy - (canvas_h / 2.0);
+                // Use the same left/top anchor used for the canvas (50% / 38%) so the
+                // cat sits correctly above the canvas. We apply a translation that
+                // adjusts from the anchor by the computed offsets.
+                // Compute a square pixel size for the DOM cat so it fits within a
+                // single grid cell with some padding. Use the smaller of cell_w
+                // and cell_h to remain consistent across non-square boards.
+                let cat_size = (cell_w.min(cell_h) * 0.75).round() as i32;
+                let style = format!(
+                    "position:fixed; left:50%; top:38%; transform:translate(calc(-50% + {ox}px), calc(-50% + {oy}px)); pointer-events:none; z-index:40; width:{w}px; height:{h}px;",
+                    ox = offset_x,
+                    oy = offset_y,
+                    w = cat_size,
+                    h = cat_size
+                );
+                el.set_attribute("style", &style).ok();
+            }
+        }
+    }
 
     // Slash effects (tile-space, same visual as before)
     for eff in &state.slash_effects {
@@ -1173,6 +1234,14 @@ fn set_level(state: &mut BoardState, new_index: usize, now: f64, current_beat: i
     }
     state.cat_x = cx;
     state.cat_y = cy;
+    // Reset hop animation so cat remains consistent with new level
+    state.cat_from_x = state.cat_x;
+    state.cat_from_y = state.cat_y;
+    state.cat_target_x = state.cat_x;
+    state.cat_target_y = state.cat_y;
+    state.cat_hop_start_ms = now;
+    state.cat_hop_duration_ms = 220.0;
+    state.cat_hopping = false;
 
     // Reset beat clock to the new level's BPM
     state.beat = BeatClock {

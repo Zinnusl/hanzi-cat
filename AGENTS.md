@@ -127,6 +127,10 @@ Agents may append items here with justification:
 
 - Board set_level: Replaced legacy pieces/last_spawn_beat reset with grid reinitialization and cat repositioning. The set_level() implementation now reconstructs state.grid using pick_random_hanzi for non-block tiles, places the cat on a non-block tile (center-biased), and resets beat/temporary modifiers. Verified cargo build completes (warnings only).
 
+- DOM SVG (#hc-cat) positioning migration: Replaced canvas-drawn per-piece "baby chicken" sprite with an absolutely positioned DOM SVG (#hc-cat) anchored over the game canvas. Positioning now uses a CSS-anchor approach and per-frame set_attribute updates to avoid expanding web-sys feature usage; cargo build verified (warnings only). Visual runtime verification in-browser is still recommended to confirm z-index, pointer-events, and interpolation behavior.
+
+- Cat sizing fix: Adjusted DOM #hc-cat SVG sizing so it fits within a single grid cell. The runtime now computes a square cat_size from the smaller of cell_w and cell_h (scaled by a padding factor) and sets inline width/height on #hc-cat each frame to prevent overflow across board sizes; cargo build verified (warnings only). Visual runtime verification recommended to confirm consistent fit and appearance across levels.
+
 ---
 This document is a living reference for agents. Update responsibly and keep it tightly aligned with actual repository state.
 
