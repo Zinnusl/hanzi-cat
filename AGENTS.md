@@ -125,6 +125,8 @@ Agents may append items here with justification:
 
 - Synchronized repository layout: moved new level modules under `src/board/` to match existing module path expectations.
 
+- Board set_level: Replaced legacy pieces/last_spawn_beat reset with grid reinitialization and cat repositioning. The set_level() implementation now reconstructs state.grid using pick_random_hanzi for non-block tiles, places the cat on a non-block tile (center-biased), and resets beat/temporary modifiers. Verified cargo build completes (warnings only).
+
 ---
 This document is a living reference for agents. Update responsibly and keep it tightly aligned with actual repository state.
 

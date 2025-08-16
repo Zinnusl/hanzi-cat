@@ -183,8 +183,9 @@ struct BoardState {
     ctx: CanvasRenderingContext2d,
     level: &'static LevelDesc,
     beat: BeatClock,
-    pieces: Vec<Piece>,
-    last_spawn_beat: i64,
+    grid: Vec<Option<(&'static str, &'static str)>>,
+    cat_x: u8,
+    cat_y: u8,
     level_index: usize,
     // --- Dynamic state for modifiers ---
     score: i64,
@@ -275,8 +276,83 @@ pub fn start_board_mode() -> Result<(), JsValue> {
         ctx: ctx.clone(),
         level: levels()[0],
         beat: BeatClock::new(levels()[0].bpm, now),
-        pieces: Vec::new(),
-        last_spawn_beat: -1,
+        grid: {
+            let lvl = levels()[0];
+            let mut g: Vec<Option<(&'static str, &'static str)>> =
+                Vec::with_capacity(lvl.width as usize * lvl.height as usize);
+            for yy in 0..lvl.height {
+                for xx in 0..lvl.width {
+                    let tile = lvl.tile(xx, yy);
+                    if matches!(tile.obstacle, Some(ObstacleKind::Block)) {
+                        g.push(None);
+                    } else {
+                        let (hanzi, pinyin) = match lvl.name {
+                            "Conveyor Crossing" => {
+                                let hidx = rand_index(LEVEL2_HANZI.len());
+                                LEVEL2_HANZI[hidx]
+                            }
+                            "Zigzag Express" => {
+                                let hidx = rand_index(LEVEL4_HANZI.len());
+                                LEVEL4_HANZI[hidx]
+                            }
+                            "Maze Challenge" => {
+                                let hidx = rand_index(LEVEL3_HANZI.len());
+                                LEVEL3_HANZI[hidx]
+                            }
+                            "Spiral Dream" => {
+                                let hidx = rand_index(LEVEL5_HANZI.len());
+                                LEVEL5_HANZI[hidx]
+                            }
+                            "Crystal Isle" => {
+                                let hidx = rand_index(LEVEL6_HANZI.len());
+                                LEVEL6_HANZI[hidx]
+                            }
+                            "Neon Bastion" => {
+                                let hidx = rand_index(LEVEL7_HANZI.len());
+                                LEVEL7_HANZI[hidx]
+                            }
+                            _ => ("你", "ni3"),
+                        };
+                        g.push(Some((hanzi, pinyin)));
+                    }
+                }
+            }
+            g
+        },
+        cat_x: {
+            let lvl = levels()[0];
+            let mut cx = lvl.width / 2;
+            let mut cy = lvl.height / 2;
+            if matches!(lvl.tile(cx, cy).obstacle, Some(ObstacleKind::Block)) {
+                'search_free: for yy in 0..lvl.height {
+                    for xx in 0..lvl.width {
+                        if !matches!(lvl.tile(xx, yy).obstacle, Some(ObstacleKind::Block)) {
+                            cx = xx;
+                            cy = yy;
+                            break 'search_free;
+                        }
+                    }
+                }
+            }
+            cx
+        },
+        cat_y: {
+            let lvl = levels()[0];
+            let mut cx = lvl.width / 2;
+            let mut cy = lvl.height / 2;
+            if matches!(lvl.tile(cx, cy).obstacle, Some(ObstacleKind::Block)) {
+                'search_free2: for yy in 0..lvl.height {
+                    for xx in 0..lvl.width {
+                        if !matches!(lvl.tile(xx, yy).obstacle, Some(ObstacleKind::Block)) {
+                            cx = xx;
+                            cy = yy;
+                            break 'search_free2;
+                        }
+                    }
+                }
+            }
+            cy
+        },
         level_index: 0,
         score: 0,
         score_multiplier: 1.0,
@@ -339,37 +415,48 @@ pub fn start_board_mode() -> Result<(), JsValue> {
                     } else if key == "Enter" {
                         if !state.typing.is_empty() {
                             let typed = state.typing.clone();
-                            let mut matched_positions: Vec<(u8, u8)> = Vec::new();
-                            // Collect indices of pieces to remove
-                            let mut remove_flags: Vec<bool> = vec![false; state.pieces.len()];
-                            for (i, p) in state.pieces.iter().enumerate() {
-                                if p.pinyin == typed {
-                                    remove_flags[i] = true;
-                                    matched_positions.push((p.x, p.y));
+                            // Look for matching adjacent tile (up, right, down, left)
+                            let dirs: [(i8, i8); 4] = [(0, -1), (1, 0), (0, 1), (-1, 0)];
+                            let mut found: Option<((u8, u8), usize)> = None;
+                            for (dx, dy) in dirs.iter() {
+                                let nx_i = state.cat_x as i8 + *dx;
+                                let ny_i = state.cat_y as i8 + *dy;
+                                if nx_i < 0 || ny_i < 0 {
+                                    continue;
+                                }
+                                let nx = nx_i as u8;
+                                let ny = ny_i as u8;
+                                if nx >= state.level.width || ny >= state.level.height {
+                                    continue;
+                                }
+                                // skip blocked tiles
+                                if matches!(state.level.tile(nx, ny).obstacle, Some(ObstacleKind::Block)) {
+                                    continue;
+                                }
+                                let idx = ny as usize * state.level.width as usize + nx as usize;
+                                if let Some((_, pinyin)) = state.grid[idx] {
+                                    if pinyin == typed.as_str() {
+                                        found = Some(((nx, ny), idx));
+                                        break;
+                                    }
                                 }
                             }
-                            if !matched_positions.is_empty() {
-                                // Score: base per piece * multiplier
+                            if let Some(((mx, my), gidx)) = found {
+                                // Move cat into tile and consume it
+                                state.cat_x = mx;
+                                state.cat_y = my;
+                                state.grid[gidx] = None;
+                                // Score and visual effect
                                 let per = (180.0 * state.score_multiplier) as i64;
-                                state.score += per * matched_positions.len() as i64;
-                                // Add effects
+                                state.score += per;
                                 let now_ts = window()
                                     .and_then(|w| w.performance())
                                     .map(|p| p.now())
                                     .unwrap_or(0.0);
-                                for (x, y) in matched_positions {
-                                    state.slash_effects.push(SlashEffect {
-                                        x,
-                                        y,
-                                        start_ms: now_ts,
-                                    });
-                                }
-                                // Retain only non-removed pieces
-                                let mut idx = 0usize;
-                                state.pieces.retain(|_| {
-                                    let keep = !remove_flags[idx];
-                                    idx += 1;
-                                    keep
+                                state.slash_effects.push(SlashEffect {
+                                    x: mx,
+                                    y: my,
+                                    start_ms: now_ts,
                                 });
                             }
                             state.typing.clear();
@@ -529,134 +616,48 @@ fn board_tick(state: &mut BoardState, now: f64) {
 }
 
 
-fn on_new_beat(state: &mut BoardState, beat_idx: i64, now: f64) {
-    // Base hop duration (one half-beat @ 120 BPM ~= 250ms, scaled by hop_time_factor)
-    let base_hop_ms = 220.0 * state.hop_time_factor;
-
-    // Spawn rule: every 4 beats up to a soft cap of 5 concurrent pieces.
-    // Do not spawn when game is over.
-    if !state.game_over && beat_idx % 4 == 0 && state.pieces.len() < 5 {
-        if !state.level.spawn_points.is_empty() {
-            let idx = rand_index(state.level.spawn_points.len());
-            let (sx, sy) = state.level.spawn_points[idx];
-            // Select Hanzi set based on current level
-            let (hanzi, pinyin) = match state.level.name {
-                "Conveyor Crossing" => {
-                    let hidx = rand_index(LEVEL2_HANZI.len());
-                    LEVEL2_HANZI[hidx]
-                }
-                "Zigzag Express" => {
-                    let hidx = rand_index(LEVEL4_HANZI.len());
-                    LEVEL4_HANZI[hidx]
-                }
-                "Maze Challenge" => {
-                    let hidx = rand_index(LEVEL3_HANZI.len());
-                    LEVEL3_HANZI[hidx]
-                }
-                "Spiral Dream" => {
-                    let hidx = rand_index(LEVEL5_HANZI.len());
-                    LEVEL5_HANZI[hidx]
-                }
-                "Crystal Isle" => {
-                    let hidx = rand_index(LEVEL6_HANZI.len());
-                    LEVEL6_HANZI[hidx]
-                }
-                "Neon Bastion" => {
-                    let hidx = rand_index(LEVEL7_HANZI.len());
-                    LEVEL7_HANZI[hidx]
-                }
-                _ => ("你", "ni3"),
-            };
-            let piece = Piece::new(hanzi, pinyin, sx, sy, now, base_hop_ms);
-            state.pieces.push(piece);
+fn on_new_beat(state: &mut BoardState, _beat_idx: i64, _now: f64) {
+    // Grid-based refill: on each beat, refill any empty (None) cells
+    // with a randomly chosen hanzi/pinyin appropriate for the current level.
+    // Skip tiles that are blocked.
+    if state.game_over {
+        return;
+    }
+    let lvl = state.level;
+    for y in 0..lvl.height {
+        for x in 0..lvl.width {
+            // skip blocked tiles
+            if matches!(lvl.tile(x, y).obstacle, Some(ObstacleKind::Block)) {
+                continue;
+            }
+            let idx = y as usize * lvl.width as usize + x as usize;
+            if state.grid[idx].is_none() {
+                let (h, p) = pick_random_hanzi(lvl);
+                state.grid[idx] = Some((h, p));
+            }
         }
     }
-
-    // Schedule a hop for each arrived piece toward goal on each beat.
-    for p in &mut state.pieces {
-        if !p.arrived {
-            continue;
-        }
-        if let Some((nx, ny)) = choose_next_for_piece(state.level, p) {
-            p.begin_hop(nx, ny, now, base_hop_ms);
-        }
-    }
-
-    // Future hooks: tempo-shift recalculation (c6) could adjust hop_time_factor here.
+    // Future: consider refilling only a subset per beat to tune pacing.
 }
 
-fn update_pieces(state: &mut BoardState, now: f64, whole_beat: i64) {
-    // Phase 1: progress hops and record arrivals
-    let mut arrived_indices: Vec<usize> = Vec::new();
-    for (idx, p) in state.pieces.iter_mut().enumerate() {
-        if p.arrived {
-            continue;
-        }
-        let t = ((now - p.hop_start_ms) / p.hop_duration_ms).clamp(0.0, 1.0);
-        if t >= 1.0 {
-            p.arrived = true;
-            p.x = p.target_x;
-            p.y = p.target_y;
-            arrived_indices.push(idx);
-        }
-    }
-    // Phase 2: apply tile effects without aliasing mutable borrow of state
-    arrived_indices.sort_unstable();
-    for idx in arrived_indices.into_iter().rev() {
-        // remove from end to avoid shifting earlier indices
-        if idx < state.pieces.len() {
-            let mut piece = state.pieces.swap_remove(idx);
-            apply_tile_effects(&mut piece, state, whole_beat, now);
-            state.pieces.push(piece); // order not important for prototype
-        }
-    }
-    // Goal handling: treat pieces reaching any goal tile as misses (lose life)
-    let mut misses = 0usize;
-    state.pieces.retain(|p| {
-        let goal = state
-            .level
-            .goal_region
-            .iter()
-            .any(|&(gx, gy)| gx == p.x && gy == p.y);
-        if goal {
-            misses += 1;
-            // Add a slash effect where piece reached goal
-            let now_ms = window()
-                .and_then(|w| w.performance())
-                .map(|p| p.now())
-                .unwrap_or(0.0);
-            state.slash_effects.push(SlashEffect {
-                x: p.x,
-                y: p.y,
-                start_ms: now_ms,
-            });
-            false
-        } else {
-            true
-        }
-    });
-    if misses > 0 {
-        state.lives -= misses as i32;
-        if state.lives <= 0 {
-            state.game_over = true;
-        }
-    }
+fn update_pieces(_state: &mut BoardState, _now: f64, _whole_beat: i64) {
+    // No-op: moving-piece logic removed in favor of a static grid + player-controlled
+    // cat. Tile lifecycle (spawn/refill) is handled in on_new_beat and player
+    // actions manipulate state.grid directly. Keeping this function as a no-op
+    // preserves the existing call site in board_tick while removing references
+    // to the old `pieces` collection.
 }
 
 fn render_board(state: &mut BoardState, now: f64) {
-    // Beat pulse backdrop (subtle) based on fractional beat progress.
+    // Render background with a subtle beat pulse.
     let beat_phase = {
         let cb = state.beat.current_beat(now);
         (cb - cb.floor()) as f64
     };
-    let pulse = ((beat_phase * std::f64::consts::TAU).sin() * 0.5 + 0.5) * 0.25; // 0..0.25
+    let pulse = ((beat_phase * std::f64::consts::TAU).sin() * 0.5 + 0.5) * 0.25;
     let cell_w = state.canvas.width() as f64 / state.level.width as f64;
     let cell_h = state.canvas.height() as f64 / state.level.height as f64;
-    let bg = (15.0 + pulse * 40.0) as i32; // animate brightness a bit
-    // For compilation robustness avoid the CanvasGradient/Result handling which
-    // can differ across web-sys versions. Use a single solid fill color based
-    // on the calculated brightness. This preserves a similar backdrop while
-    // eliminating type mismatches.
+    let bg = (15.0 + pulse * 40.0) as i32;
     let color = format!(
         "rgb({},{},{})",
         (bg + 18).clamp(0, 255),
@@ -664,20 +665,13 @@ fn render_board(state: &mut BoardState, now: f64) {
         (bg + 12).clamp(0, 255)
     );
     state.ctx.set_fill_style_str(&color);
-    state.ctx.fill_rect(
-        0.0,
-        0.0,
-        state.canvas.width() as f64,
-        state.canvas.height() as f64,
-    );
+    state.ctx.fill_rect(0.0, 0.0, state.canvas.width() as f64, state.canvas.height() as f64);
 
-    // Spawn row accent (assumes all spawns top row). Draw subtle translucent band.
+    // Top accent band (spawn row visual)
     state.ctx.set_fill_style_str("rgba(255,220,120,0.08)");
-    state
-        .ctx
-        .fill_rect(0.0, 0.0, state.canvas.width() as f64, cell_h);
+    state.ctx.fill_rect(0.0, 0.0, state.canvas.width() as f64, cell_h);
 
-    // Goal region highlight tiles (before grid so lines appear above)
+    // Highlight goal region tiles
     state.ctx.set_fill_style_str("rgba(120,200,255,0.10)");
     for &(gx, gy) in state.level.goal_region.iter() {
         let px = gx as f64 * cell_w;
@@ -685,7 +679,7 @@ fn render_board(state: &mut BoardState, now: f64) {
         state.ctx.fill_rect(px, py, cell_w, cell_h);
     }
 
-    // Draw grid
+    // Grid lines
     state.ctx.set_stroke_style_str("#222");
     state.ctx.set_line_width(2.0);
     for x in 0..=state.level.width {
@@ -697,20 +691,18 @@ fn render_board(state: &mut BoardState, now: f64) {
         line(&state.ctx, 0.0, fy, state.canvas.width() as f64, fy);
     }
 
-    // Hover highlight (draw after grid, before pieces/obstacles for now)
+    // Hover highlight
     if let Some((hx, hy)) = state.hover_tile {
         if hx < state.level.width && hy < state.level.height {
             let px = hx as f64 * cell_w;
             let py = hy as f64 * cell_h;
             state.ctx.set_stroke_style_str("rgba(255,240,150,0.55)");
             state.ctx.set_line_width(3.0);
-            state
-                .ctx
-                .stroke_rect(px + 1.5, py + 1.5, cell_w - 3.0, cell_h - 3.0);
+            state.ctx.stroke_rect(px + 1.5, py + 1.5, cell_w - 3.0, cell_h - 3.0);
         }
     }
 
-    // Obstacles
+    // Obstacles (draw before cell content so they sit beneath Hanzi when appropriate)
     for y in 0..state.level.height {
         for x in 0..state.level.width {
             let t = state.level.tile(x, y);
@@ -720,40 +712,82 @@ fn render_board(state: &mut BoardState, now: f64) {
         }
     }
 
-    // Pieces
-    for p in &state.pieces {
-        // Interpolate position if moving (parabolic hop arc for readability)
-        let (mut px, mut py) = (p.x as f64, p.y as f64);
-        let mut hop_lift = 0.0;
-        if !p.arrived {
-            let frac = ((now - p.hop_start_ms) / p.hop_duration_ms).clamp(0.0, 1.0);
-            px = p.x as f64 + (p.target_x as f64 - p.x as f64) * frac;
-            py = p.y as f64 + (p.target_y as f64 - p.y as f64) * frac;
-            hop_lift = (-(frac - 0.5).powi(2) + 0.25) * cell_h * 0.55; // simple arc
+    // Draw cell hanzi (centered). Use a consistent layered stroke+fill like the piece renderer.
+    state.ctx.set_shadow_color("rgba(0,0,0,0.55)");
+    state.ctx.set_shadow_blur(12.0);
+    state.ctx.set_shadow_offset_x(0.0);
+    state.ctx.set_shadow_offset_y(3.0);
+
+    for y in 0..state.level.height {
+        for x in 0..state.level.width {
+            let idx = y as usize * state.level.width as usize + x as usize;
+            if let Some((hanzi, _pinyin)) = state.grid[idx] {
+                let cx = x as f64 * cell_w + cell_w / 2.0;
+                let cy = y as f64 * cell_h + cell_h / 2.0 + 8.0; // small vertical offset
+                state.ctx.set_line_width(6.0);
+                state.ctx.set_stroke_style_str("rgba(0,0,0,0.85)");
+                state.ctx.stroke_text(hanzi, cx, cy).ok();
+                // crisp fill
+                state.ctx.set_shadow_blur(0.0);
+                state.ctx.set_fill_style_str("#ffffff");
+                state.ctx.fill_text(hanzi, cx, cy).ok();
+                state.ctx.set_line_width(2.0);
+                state.ctx.set_stroke_style_str("rgba(255,210,120,0.55)");
+                state.ctx.stroke_text(hanzi, cx, cy).ok();
+                // restore shadow for next glyph
+                state.ctx.set_shadow_blur(12.0);
+            }
         }
-        let cx = px * cell_w + cell_w / 2.0;
-        let cy = py * cell_h + cell_h / 2.0 + 14.0 - hop_lift; // apply lift
-        // Drop shadow + layered strokes for clarity and depth
-        state.ctx.set_shadow_color("rgba(0,0,0,0.55)");
-        state.ctx.set_shadow_blur(14.0);
-        state.ctx.set_shadow_offset_x(0.0);
-        state.ctx.set_shadow_offset_y(4.0);
-        state.ctx.set_line_width(6.0);
-        state.ctx.set_stroke_style_str("rgba(0,0,0,0.85)");
-        state.ctx.stroke_text(p.hanzi, cx, cy).ok();
-        // Remove shadow for fill to stay crisp
-        state.ctx.set_shadow_blur(0.0);
-        state.ctx.set_shadow_offset_x(0.0);
-        state.ctx.set_shadow_offset_y(0.0);
-        state.ctx.set_fill_style_str("#ffffff");
-        state.ctx.fill_text(p.hanzi, cx, cy).ok();
-        // Accent inner glow stroke
-        state.ctx.set_line_width(2.0);
-        state.ctx.set_stroke_style_str("rgba(255,210,120,0.55)");
-        state.ctx.stroke_text(p.hanzi, cx, cy).ok();
     }
 
-    // Slash effects (draw after pieces for overlay)
+    // Clear shadows after drawing text
+    state.ctx.set_shadow_blur(0.0);
+    state.ctx.set_shadow_offset_x(0.0);
+    state.ctx.set_shadow_offset_y(0.0);
+
+    // Draw the cat at its tile (simple circular cat head + ears + eyes)
+    let cat_cx = state.cat_x as f64 * cell_w + cell_w / 2.0;
+    let cat_cy = state.cat_y as f64 * cell_h + cell_h / 2.0;
+
+    // Body / head
+    state.ctx.set_fill_style_str("#ffd166");
+    state.ctx.begin_path();
+    state.ctx.arc(cat_cx, cat_cy - cell_h * 0.08, cell_h * 0.22, 0.0, std::f64::consts::TAU).ok();
+    state.ctx.fill();
+
+    // Ears
+    state.ctx.set_fill_style_str("#ffb703");
+    state.ctx.begin_path();
+    state.ctx.move_to(cat_cx - cell_w * 0.12, cat_cy - cell_h * 0.28);
+    state.ctx.line_to(cat_cx - cell_w * 0.04, cat_cy - cell_h * 0.20);
+    state.ctx.line_to(cat_cx - cell_w * 0.04, cat_cy - cell_h * 0.28);
+    state.ctx.close_path();
+    state.ctx.fill();
+    state.ctx.begin_path();
+    state.ctx.move_to(cat_cx + cell_w * 0.12, cat_cy - cell_h * 0.28);
+    state.ctx.line_to(cat_cx + cell_w * 0.04, cat_cy - cell_h * 0.20);
+    state.ctx.line_to(cat_cx + cell_w * 0.04, cat_cy - cell_h * 0.28);
+    state.ctx.close_path();
+    state.ctx.fill();
+
+    // Eyes
+    state.ctx.set_fill_style_str("#000000");
+    state.ctx.begin_path();
+    state.ctx.arc(cat_cx - cell_w * 0.06, cat_cy - cell_h * 0.06, cell_h * 0.03, 0.0, std::f64::consts::TAU).ok();
+    state.ctx.fill();
+    state.ctx.begin_path();
+    state.ctx.arc(cat_cx + cell_w * 0.06, cat_cy - cell_h * 0.06, cell_h * 0.03, 0.0, std::f64::consts::TAU).ok();
+    state.ctx.fill();
+
+    // Mouth line
+    state.ctx.set_stroke_style_str("#cc4b37");
+    state.ctx.set_line_width(2.0);
+    state.ctx.begin_path();
+    state.ctx.move_to(cat_cx - cell_w * 0.03, cat_cy + cell_h * 0.02);
+    state.ctx.line_to(cat_cx + cell_w * 0.03, cat_cy + cell_h * 0.02);
+    state.ctx.stroke();
+
+    // Slash effects (tile-space, same visual as before)
     for eff in &state.slash_effects {
         let age = now - eff.start_ms;
         let alpha = 1.0 - (age / 300.0).clamp(0.0, 1.0);
@@ -768,10 +802,7 @@ fn render_board(state: &mut BoardState, now: f64) {
         let right = px + cell_w - inset;
         let bottom = py + cell_h - inset;
         state.ctx.set_line_width(4.0);
-        state
-            .ctx
-            .set_stroke_style_str(&format!("rgba(255,80,80,{alpha})"));
-        // Three parallel diagonal slashes
+        state.ctx.set_stroke_style_str(&format!("rgba(255,80,80,{alpha})"));
         for i in 0..3 {
             let offset = i as f64 * 6.0;
             state.ctx.begin_path();
@@ -781,15 +812,10 @@ fn render_board(state: &mut BoardState, now: f64) {
         }
     }
 
-    // GAME OVER overlay
+    // GAME OVER overlay (unchanged)
     if state.game_over {
         state.ctx.set_fill_style_str("rgba(0,0,0,0.55)");
-        state.ctx.fill_rect(
-            0.0,
-            0.0,
-            state.canvas.width() as f64,
-            state.canvas.height() as f64,
-        );
+        state.ctx.fill_rect(0.0, 0.0, state.canvas.width() as f64, state.canvas.height() as f64);
         state.ctx.set_fill_style_str("#ffffff");
         state.ctx.set_font("72px 'Noto Serif SC', serif");
         state.ctx.set_text_align("center");
@@ -800,10 +826,7 @@ fn render_board(state: &mut BoardState, now: f64) {
         state.ctx.stroke_text("GAME OVER", cx, cy).ok();
         state.ctx.fill_text("GAME OVER", cx, cy).ok();
         state.ctx.set_font("20px 'Fira Code', monospace");
-        state
-            .ctx
-            .fill_text("Refresh to try again", cx, cy + 44.0)
-            .ok();
+        state.ctx.fill_text("Refresh to try again", cx, cy + 44.0).ok();
     }
 }
 
@@ -1113,15 +1136,52 @@ fn check_level_progression(state: &mut BoardState, now: f64, current_beat: i64) 
 }
 
 fn set_level(state: &mut BoardState, new_index: usize, now: f64, current_beat: i64) {
+    // Switch to the new level descriptor and reinitialize dynamic per-level state.
     state.level_index = new_index;
     state.level = levels()[new_index];
-    state.pieces.clear();
-    state.last_spawn_beat = current_beat; // prevent immediate double-spawn
+
+    // Rebuild the grid for the new level. Block tiles remain None; other tiles
+    // are filled with a random hanzi/pinyin appropriate to the level.
+    let lvl = state.level;
+    state.grid.clear();
+    state.grid.reserve(lvl.width as usize * lvl.height as usize);
+    for yy in 0..lvl.height {
+        for xx in 0..lvl.width {
+            let tile = lvl.tile(xx, yy);
+            if matches!(tile.obstacle, Some(ObstacleKind::Block)) {
+                state.grid.push(None);
+            } else {
+                let (h, p) = pick_random_hanzi(lvl);
+                state.grid.push(Some((h, p)));
+            }
+        }
+    }
+
+    // Position the cat near the center or on the first non-block tile found.
+    let mut cx = lvl.width / 2;
+    let mut cy = lvl.height / 2;
+    if matches!(lvl.tile(cx, cy).obstacle, Some(ObstacleKind::Block)) {
+        'search_free: for yy in 0..lvl.height {
+            for xx in 0..lvl.width {
+                if !matches!(lvl.tile(xx, yy).obstacle, Some(ObstacleKind::Block)) {
+                    cx = xx;
+                    cy = yy;
+                    break 'search_free;
+                }
+            }
+        }
+    }
+    state.cat_x = cx;
+    state.cat_y = cy;
+
+    // Reset beat clock to the new level's BPM
     state.beat = BeatClock {
         bpm: state.level.bpm,
         start_ms: now,
         last_beat_idx: -1,
     };
+
+    // Reset temporary modifiers
     state.hop_time_factor = 1.0;
     state.hop_time_end_beat = -1;
     state.score_multiplier = 1.0;
@@ -1141,6 +1201,38 @@ fn rand_index(len: usize) -> usize {
         .wrapping_mul(1664525)
         .wrapping_add(1013904223)
         % len
+}
+
+/// Pick a random hanzi / pinyin tuple appropriate for the given level.
+/// Centralizes the per-level selection logic used in multiple places.
+fn pick_random_hanzi(level: &LevelDesc) -> (&'static str, &'static str) {
+    match level.name {
+        "Conveyor Crossing" => {
+            let hidx = rand_index(LEVEL2_HANZI.len());
+            LEVEL2_HANZI[hidx]
+        }
+        "Zigzag Express" => {
+            let hidx = rand_index(LEVEL4_HANZI.len());
+            LEVEL4_HANZI[hidx]
+        }
+        "Maze Challenge" => {
+            let hidx = rand_index(LEVEL3_HANZI.len());
+            LEVEL3_HANZI[hidx]
+        }
+        "Spiral Dream" => {
+            let hidx = rand_index(LEVEL5_HANZI.len());
+            LEVEL5_HANZI[hidx]
+        }
+        "Crystal Isle" => {
+            let hidx = rand_index(LEVEL6_HANZI.len());
+            LEVEL6_HANZI[hidx]
+        }
+        "Neon Bastion" => {
+            let hidx = rand_index(LEVEL7_HANZI.len());
+            LEVEL7_HANZI[hidx]
+        }
+        _ => ("你", "ni3"),
+    }
 }
 
 /// Decide next step for a piece taking into account momentum (ice), jump pads, and
