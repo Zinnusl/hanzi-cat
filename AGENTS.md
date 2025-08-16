@@ -131,6 +131,15 @@ Agents may append items here with justification:
 
 - Cat sizing fix: Adjusted DOM #hc-cat SVG sizing so it fits within a single grid cell. The runtime now computes a square cat_size from the smaller of cell_w and cell_h (scaled by a padding factor) and sets inline width/height on #hc-cat each frame to prevent overflow across board sizes; cargo build verified (warnings only). Visual runtime verification recommended to confirm consistent fit and appearance across levels.
 
+- Board neighbor & player-tile update: When initializing level 0 (and when set_level runs), the player's tile is cleared (left empty). Up-to-8 surrounding tiles are populated with distinct hanzi drawn from the single-hanzi pool to guarantee unique adjacent characters for early gameplay; the remainder of the board is filled using an alternating two-character parity pattern. Implementation: src/board/mod.rs (grid prefill and set_level adjustments).
+
 ---
+This document is a living reference for agents. Update responsibly and keep it tightly aligned with actual repository state.
+
+- Recent edits: Updated board neighbor refill and pick_random_hanzi in src/board/mod.rs; implemented hop-completion neighbor refresh and landing tile consumption.
+- Implementation details: pick_random_hanzi now samples from SINGLE_HANZI with fallback to ("你","ni3"); update_pieces now consumes the landing tile on hop finish and, for level 0, repopulates up-to-8 neighbor tiles with unique entries drawn from SINGLE_HANZI and parity-fills remaining non-block tiles.
+- Build: Ran `cargo build --verbose`; compilation completed successfully with warnings (20 warnings).
+- Task tracking: Marked todos t18-3 and t18-4 as done.
+
 This document is a living reference for agents. Update responsibly and keep it tightly aligned with actual repository state.
 

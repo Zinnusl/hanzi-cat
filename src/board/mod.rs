@@ -392,6 +392,99 @@ pub fn start_board_mode() -> Result<(), JsValue> {
     board.cat_hop_duration_ms = 220.0;
     board.cat_hopping = false;
 
+    // Ensure the player's current tile is empty and that adjacent tiles around the
+    // player are populated with distinct hanzi for the first board. The remaining
+    // cells are filled with an alternating two-character pattern.
+    {
+        let lvl = board.level;
+        let w = lvl.width as usize;
+        let h = lvl.height as usize;
+        let cx = board.cat_x as i32;
+        let cy = board.cat_y as i32;
+
+        // Collect 8-connected neighbor indices, skip blocked tiles
+        let mut neighbors: Vec<usize> = Vec::new();
+        for dy in -1..=1 {
+            for dx in -1..=1 {
+                if dx == 0 && dy == 0 {
+                    continue;
+                }
+                let nx = cx + dx;
+                let ny = cy + dy;
+                if nx < 0 || ny < 0 {
+                    continue;
+                }
+                let nxu = nx as u8;
+                let nyu = ny as u8;
+                if nxu >= lvl.width || nyu >= lvl.height {
+                    continue;
+                }
+                if matches!(lvl.tile(nxu, nyu).obstacle, Some(ObstacleKind::Block)) {
+                    continue;
+                }
+                neighbors.push(ny as usize * w + nx as usize);
+            }
+        }
+
+        // Clear player's tile
+        if cx >= 0 && cy >= 0 && (cx as u8) < lvl.width && (cy as u8) < lvl.height {
+            let cat_idx = cy as usize * w + cx as usize;
+            if cat_idx < board.grid.len() {
+                board.grid[cat_idx] = None;
+            }
+        }
+
+        if board.level_index == 0 && !neighbors.is_empty() {
+            let pool = crate::SINGLE_HANZI;
+            let pool_len = pool.len();
+            if pool_len > 0 {
+                // Choose a contiguous run from the pool (random start) and take
+                // enough unique entries for neighbors plus two for the alternating pattern.
+                let mut selected: Vec<(&'static str, &'static str)> = Vec::new();
+                let mut start = rand_index(pool_len);
+                while selected.len() < neighbors.len() + 2 && selected.len() < pool_len {
+                    let cand = pool[start % pool_len];
+                    if !selected.iter().any(|(h, _)| *h == cand.0) {
+                        selected.push(cand);
+                    }
+                    start = (start + 1) % pool_len;
+                }
+
+                // Assign unique characters to the neighbor tiles.
+                for (i, &idx) in neighbors.iter().enumerate() {
+                    if i < selected.len() {
+                        board.grid[idx] = Some(selected[i]);
+                    } else {
+                        let (h, p) = pick_random_hanzi(lvl);
+                        board.grid[idx] = Some((h, p));
+                    }
+                }
+
+                // Pick two characters for the alternating fill pattern.
+                let (pat0, pat1) = if selected.len() >= neighbors.len() + 2 {
+                    (selected[neighbors.len()], selected[neighbors.len() + 1])
+                } else {
+                    (crate::SINGLE_HANZI[0], crate::SINGLE_HANZI[(1 % pool_len)])
+                };
+
+                // Fill remaining empty, non-block tiles with an (x+y) parity pattern.
+                for y in 0..h {
+                    for x in 0..w {
+                        let idx = y * w + x;
+                        // Do not fill the player's tile (cat) so it remains empty.
+                        if x == board.cat_x as usize && y == board.cat_y as usize {
+                            continue;
+                        }
+                        if board.grid[idx].is_none() && !matches!(lvl.tile(x as u8, y as u8).obstacle, Some(ObstacleKind::Block)) {
+                            let parity = (x + y) % 2;
+                            board.grid[idx] = Some(if parity == 0 { pat0 } else { pat1 });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     BOARD_STATE.with(|b| b.replace(Some(board)));
 
     // Ensure typing overlay exists
@@ -653,7 +746,8 @@ fn board_tick(state: &mut BoardState, now: f64) {
 fn on_new_beat(state: &mut BoardState, _beat_idx: i64, _now: f64) {
     // Grid-based refill: on each beat, refill any empty (None) cells
     // with a randomly chosen hanzi/pinyin appropriate for the current level.
-    // Skip tiles that are blocked.
+    // Skip tiles that are blocked and avoid overwriting the player's tile or
+    // the cat's destination tile while a hop animation is in progress.
     if state.game_over {
         return;
     }
@@ -664,6 +758,18 @@ fn on_new_beat(state: &mut BoardState, _beat_idx: i64, _now: f64) {
             if matches!(lvl.tile(x, y).obstacle, Some(ObstacleKind::Block)) {
                 continue;
             }
+
+            // Do not refill the player's current tile; it must remain empty.
+            if x == state.cat_x && y == state.cat_y {
+                continue;
+            }
+
+            // While the cat is mid-hop, avoid refilling the target tile so the
+            // arriving tile remains empty until arrival handling runs.
+            if state.cat_hopping && x == state.cat_target_x && y == state.cat_target_y {
+                continue;
+            }
+
             let idx = y as usize * lvl.width as usize + x as usize;
             if state.grid[idx].is_none() {
                 let (h, p) = pick_random_hanzi(lvl);
@@ -687,9 +793,89 @@ fn update_pieces(state: &mut BoardState, now: f64, _whole_beat: i64) {
         };
         let t = (elapsed / dur).clamp(0.0, 1.0);
         if t >= 1.0 {
+            // Finish hop animation and update canonical coordinates
             state.cat_hopping = false;
             state.cat_x = state.cat_target_x;
             state.cat_y = state.cat_target_y;
+
+            // Consume the landing tile so it remains empty after arrival.
+            let lvl = state.level;
+            let w = lvl.width as usize;
+            let idx = state.cat_y as usize * w + state.cat_x as usize;
+            if idx < state.grid.len() {
+                state.grid[idx] = None;
+            }
+
+            // For the first level, refresh up-to-8 neighbor tiles with unique
+            // hanzi drawn from SINGLE_HANZI and then parity-fill remaining empties.
+            if state.level_index == 0 {
+                let lvl = state.level;
+                let w = lvl.width as usize;
+                let h = lvl.height as usize;
+                let cx = state.cat_x as i32;
+                let cy = state.cat_y as i32;
+
+                // Collect neighbor indices (8-connected), skipping blocked tiles.
+                let mut neighbors: Vec<usize> = Vec::new();
+                for dy in -1..=1 {
+                    for dx in -1..=1 {
+                        if dx == 0 && dy == 0 { continue; }
+                        let nx = cx + dx;
+                        let ny = cy + dy;
+                        if nx < 0 || ny < 0 { continue; }
+                        let nxu = nx as u8;
+                        let nyu = ny as u8;
+                        if nxu >= lvl.width || nyu >= lvl.height { continue; }
+                        if matches!(lvl.tile(nxu, nyu).obstacle, Some(ObstacleKind::Block)) { continue; }
+                        neighbors.push(ny as usize * w + nx as usize);
+                    }
+                }
+
+                if !neighbors.is_empty() {
+                    let pool = crate::SINGLE_HANZI;
+                    let pool_len = pool.len();
+                    if pool_len > 0 {
+                        let mut selected: Vec<(&'static str, &'static str)> = Vec::new();
+                        let mut start = rand_index(pool_len);
+                        while selected.len() < neighbors.len() + 2 && selected.len() < pool_len {
+                            let cand = pool[start % pool_len];
+                            if !selected.iter().any(|(h, _)| *h == cand.0) {
+                                selected.push(cand);
+                            }
+                            start = (start + 1) % pool_len;
+                        }
+
+                        for (i, &nidx) in neighbors.iter().enumerate() {
+                            if i < selected.len() {
+                                state.grid[nidx] = Some(selected[i]);
+                            } else {
+                                let (h, p) = pick_random_hanzi(lvl);
+                                state.grid[nidx] = Some((h, p));
+                            }
+                        }
+
+                        let (pat0, pat1) = if selected.len() >= neighbors.len() + 2 {
+                            (selected[neighbors.len()], selected[neighbors.len() + 1])
+                        } else {
+                            (crate::SINGLE_HANZI[0], crate::SINGLE_HANZI[(1 % pool_len)])
+                        };
+
+                        for y in 0..h {
+                            for x in 0..w {
+                                let idx = y * w + x;
+                                // Do not fill the player's tile (cat) so it remains empty.
+                                if x == state.cat_x as usize && y == state.cat_y as usize {
+                                    continue;
+                                }
+                                if state.grid[idx].is_none() && !matches!(lvl.tile(x as u8, y as u8).obstacle, Some(ObstacleKind::Block)) {
+                                    let parity = (x + y) % 2;
+                                    state.grid[idx] = Some(if parity == 0 { pat0 } else { pat1 });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -1243,6 +1429,84 @@ fn set_level(state: &mut BoardState, new_index: usize, now: f64, current_beat: i
     state.cat_hop_duration_ms = 220.0;
     state.cat_hopping = false;
 
+    // Ensure player's tile is empty and neighbors are uniquely populated for level 0.
+    {
+        let lvl = state.level;
+        let w = lvl.width as usize;
+        let h = lvl.height as usize;
+        let cx = state.cat_x as i32;
+        let cy = state.cat_y as i32;
+
+        // Collect neighbor indices (8-connected)
+        let mut neighbors: Vec<usize> = Vec::new();
+        for dy in -1..=1 {
+            for dx in -1..=1 {
+                if dx == 0 && dy == 0 { continue; }
+                let nx = cx + dx;
+                let ny = cy + dy;
+                if nx < 0 || ny < 0 { continue; }
+                let nxu = nx as u8;
+                let nyu = ny as u8;
+                if nxu >= lvl.width || nyu >= lvl.height { continue; }
+                if matches!(lvl.tile(nxu, nyu).obstacle, Some(ObstacleKind::Block)) { continue; }
+                neighbors.push(ny as usize * w + nx as usize);
+            }
+        }
+
+        // Clear player's tile
+        if cx >= 0 && cy >= 0 && (cx as u8) < lvl.width && (cy as u8) < lvl.height {
+            let cat_idx = cy as usize * w + cx as usize;
+            if cat_idx < state.grid.len() {
+                state.grid[cat_idx] = None;
+            }
+        }
+
+        if new_index == 0 && !neighbors.is_empty() {
+            let pool = crate::SINGLE_HANZI;
+            let pool_len = pool.len();
+            if pool_len > 0 {
+                let mut selected: Vec<(&'static str, &'static str)> = Vec::new();
+                let mut start = rand_index(pool_len);
+                while selected.len() < neighbors.len() + 2 && selected.len() < pool_len {
+                    let cand = pool[start % pool_len];
+                    if !selected.iter().any(|(h, _)| *h == cand.0) {
+                        selected.push(cand);
+                    }
+                    start = (start + 1) % pool_len;
+                }
+
+                for (i, &idx) in neighbors.iter().enumerate() {
+                    if i < selected.len() {
+                        state.grid[idx] = Some(selected[i]);
+                    } else {
+                        let (h, p) = pick_random_hanzi(lvl);
+                        state.grid[idx] = Some((h, p));
+                    }
+                }
+
+                let (pat0, pat1) = if selected.len() >= neighbors.len() + 2 {
+                    (selected[neighbors.len()], selected[neighbors.len() + 1])
+                } else {
+                    (crate::SINGLE_HANZI[0], crate::SINGLE_HANZI[(1 % pool_len)])
+                };
+
+                for y in 0..h {
+                    for x in 0..w {
+                        let idx = y * w + x;
+                        // Do not fill the player's tile (cat) so it remains empty.
+                        if x == state.cat_x as usize && y == state.cat_y as usize {
+                            continue;
+                        }
+                        if state.grid[idx].is_none() && !matches!(lvl.tile(x as u8, y as u8).obstacle, Some(ObstacleKind::Block)) {
+                            let parity = (x + y) % 2;
+                            state.grid[idx] = Some(if parity == 0 { pat0 } else { pat1 });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Reset beat clock to the new level's BPM
     state.beat = BeatClock {
         bpm: state.level.bpm,
@@ -1300,7 +1564,16 @@ fn pick_random_hanzi(level: &LevelDesc) -> (&'static str, &'static str) {
             let hidx = rand_index(LEVEL7_HANZI.len());
             LEVEL7_HANZI[hidx]
         }
-        _ => ("你", "ni3"),
+        _ => {
+            let pool = crate::SINGLE_HANZI;
+            let len = pool.len();
+            if len == 0 {
+                ("你", "ni3")
+            } else {
+                let idx = rand_index(len);
+                pool[idx]
+            }
+        }
     }
 }
 
