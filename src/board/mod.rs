@@ -14,8 +14,8 @@
 //!
 //! This file currently focuses on data structures + a minimal ticking harness so we
 //! can implement gameplay incrementally.
-use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::prelude::*;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, window};
 
 // --- Core Time / Beat Model -------------------------------------------------
@@ -49,17 +49,29 @@ impl BeatClock {
 #[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
 pub enum ObstacleKind {
-    Block,                                // Cannot enter
-    Teleport { to: (u8, u8) },            // Enter -> instantly relocate
-    Conveyor { dx: i8, dy: i8 },          // Auto-push piece after landing
-    TempoShift { mult: f64, beats: u32 }, // Temporary BPM multiplier effect when stepped on
+    Block, // Cannot enter
+    Teleport {
+        to: (u8, u8),
+    }, // Enter -> instantly relocate
+    Conveyor {
+        dx: i8,
+        dy: i8,
+    }, // Auto-push piece after landing
+    TempoShift {
+        mult: f64,
+        beats: u32,
+    }, // Temporary BPM multiplier effect when stepped on
     /// Ice: slippery tile — a piece that arrives continues moving in its incoming
     /// direction on subsequent beats (momentum = 1). If a piece has no direction
     /// when arriving, it will choose a greedy step toward the goal and then slide.
     Ice,
     /// JumpPad: launches a piece further in a direction. If dx/dy are zero the
     /// pad will launch toward the nearest goal. strength = how many tiles to jump.
-    JumpPad { dx: i8, dy: i8, strength: u8 },
+    JumpPad {
+        dx: i8,
+        dy: i8,
+        strength: u8,
+    },
     Transform, // Placeholder: triggers Hanzi transformation mapping (handled by ModifierKind::TransformMap)
 }
 
@@ -257,8 +269,6 @@ fn levels() -> &'static [&'static LevelDesc] {
 
 pub static LEVEL_SCORE_THRESHOLDS: [i64; 7] = [0, 2500, 6000, 12000, 20000, 32000, 50000];
 
-
-
 #[wasm_bindgen]
 pub fn start_board_mode() -> Result<(), JsValue> {
     let win = window().ok_or_else(|| JsValue::from_str("no window"))?;
@@ -336,13 +346,13 @@ pub fn start_board_mode() -> Result<(), JsValue> {
         cat_x: {
             let lvl = levels()[0];
             let mut cx = lvl.width / 2;
-                    let mut _cy = lvl.height / 2;
-                    if matches!(lvl.tile(cx, _cy).obstacle, Some(ObstacleKind::Block)) {
-                        'search_free: for yy in 0..lvl.height {
-                            for xx in 0..lvl.width {
-                                if !matches!(lvl.tile(xx, yy).obstacle, Some(ObstacleKind::Block)) {
-                                    cx = xx;
-                                    _cy = yy;
+            let mut _cy = lvl.height / 2;
+            if matches!(lvl.tile(cx, _cy).obstacle, Some(ObstacleKind::Block)) {
+                'search_free: for yy in 0..lvl.height {
+                    for xx in 0..lvl.width {
+                        if !matches!(lvl.tile(xx, yy).obstacle, Some(ObstacleKind::Block)) {
+                            cx = xx;
+                            _cy = yy;
                             break 'search_free;
                         }
                     }
@@ -352,13 +362,13 @@ pub fn start_board_mode() -> Result<(), JsValue> {
         },
         cat_y: {
             let lvl = levels()[0];
-                    let mut _cx = lvl.width / 2;
-                    let mut cy = lvl.height / 2;
-                    if matches!(lvl.tile(_cx, cy).obstacle, Some(ObstacleKind::Block)) {
-                        'search_free2: for yy in 0..lvl.height {
-                            for xx in 0..lvl.width {
-                                if !matches!(lvl.tile(xx, yy).obstacle, Some(ObstacleKind::Block)) {
-                                    _cx = xx;
+            let mut _cx = lvl.width / 2;
+            let mut cy = lvl.height / 2;
+            if matches!(lvl.tile(_cx, cy).obstacle, Some(ObstacleKind::Block)) {
+                'search_free2: for yy in 0..lvl.height {
+                    for xx in 0..lvl.width {
+                        if !matches!(lvl.tile(xx, yy).obstacle, Some(ObstacleKind::Block)) {
+                            _cx = xx;
                             cy = yy;
                             break 'search_free2;
                         }
@@ -469,7 +479,7 @@ pub fn start_board_mode() -> Result<(), JsValue> {
                 let (pat0, pat1) = if selected.len() >= neighbors.len() + 2 {
                     (selected[neighbors.len()], selected[neighbors.len() + 1])
                 } else {
-                    (crate::SINGLE_HANZI[0], crate::SINGLE_HANZI[(1 % pool_len)])
+                    (crate::SINGLE_HANZI[0], crate::SINGLE_HANZI[1 % pool_len])
                 };
 
                 // Fill remaining empty, non-block tiles with an (x+y) parity pattern.
@@ -480,7 +490,12 @@ pub fn start_board_mode() -> Result<(), JsValue> {
                         if x == board.cat_x as usize && y == board.cat_y as usize {
                             continue;
                         }
-                        if board.grid[idx].is_none() && !matches!(lvl.tile(x as u8, y as u8).obstacle, Some(ObstacleKind::Block)) {
+                        if board.grid[idx].is_none()
+                            && !matches!(
+                                lvl.tile(x as u8, y as u8).obstacle,
+                                Some(ObstacleKind::Block)
+                            )
+                        {
                             let parity = (x + y) % 2;
                             board.grid[idx] = Some(if parity == 0 { pat0 } else { pat1 });
                         }
@@ -553,7 +568,10 @@ pub fn start_board_mode() -> Result<(), JsValue> {
                                     continue;
                                 }
                                 // skip blocked tiles
-                                if matches!(state.level.tile(nx, ny).obstacle, Some(ObstacleKind::Block)) {
+                                if matches!(
+                                    state.level.tile(nx, ny).obstacle,
+                                    Some(ObstacleKind::Block)
+                                ) {
                                     continue;
                                 }
                                 let idx = ny as usize * state.level.width as usize + nx as usize;
@@ -671,11 +689,10 @@ pub fn start_board_mode() -> Result<(), JsValue> {
     Ok(())
 }
 
- // RefCell::new isn't const on this toolchain; allow Clippy lint until a const initializer is feasible.
- #[allow(clippy::missing_const_for_thread_local)]
- thread_local! {
-     static BOARD_STATE: std::cell::RefCell<Option<BoardState>> = std::cell::RefCell::new(None);
- }
+// RefCell::new isn't const on this toolchain; allow Clippy lint until a const initializer is feasible.
+thread_local! {
+    static BOARD_STATE: std::cell::RefCell<Option<BoardState>> = std::cell::RefCell::new(None);
+}
 
 type FrameCallback = std::rc::Rc<std::cell::RefCell<Option<Closure<dyn FnMut(f64)>>>>;
 
@@ -747,7 +764,6 @@ fn board_tick(state: &mut BoardState, now: f64) {
         }
     }
 }
-
 
 fn on_new_beat(state: &mut BoardState, _beat_idx: i64, _now: f64) {
     // Grid-based refill: on each beat, refill any empty (None) cells
@@ -825,14 +841,22 @@ fn update_pieces(state: &mut BoardState, now: f64, _whole_beat: i64) {
                 let mut neighbors: Vec<usize> = Vec::new();
                 for dy in -1..=1 {
                     for dx in -1..=1 {
-                        if dx == 0 && dy == 0 { continue; }
+                        if dx == 0 && dy == 0 {
+                            continue;
+                        }
                         let nx = cx + dx;
                         let ny = cy + dy;
-                        if nx < 0 || ny < 0 { continue; }
+                        if nx < 0 || ny < 0 {
+                            continue;
+                        }
                         let nxu = nx as u8;
                         let nyu = ny as u8;
-                        if nxu >= lvl.width || nyu >= lvl.height { continue; }
-                        if matches!(lvl.tile(nxu, nyu).obstacle, Some(ObstacleKind::Block)) { continue; }
+                        if nxu >= lvl.width || nyu >= lvl.height {
+                            continue;
+                        }
+                        if matches!(lvl.tile(nxu, nyu).obstacle, Some(ObstacleKind::Block)) {
+                            continue;
+                        }
                         neighbors.push(ny as usize * w + nx as usize);
                     }
                 }
@@ -863,7 +887,7 @@ fn update_pieces(state: &mut BoardState, now: f64, _whole_beat: i64) {
                         let (pat0, pat1) = if selected.len() >= neighbors.len() + 2 {
                             (selected[neighbors.len()], selected[neighbors.len() + 1])
                         } else {
-                            (crate::SINGLE_HANZI[0], crate::SINGLE_HANZI[(1 % pool_len)])
+                            (crate::SINGLE_HANZI[0], crate::SINGLE_HANZI[1 % pool_len])
                         };
 
                         for y in 0..h {
@@ -873,7 +897,12 @@ fn update_pieces(state: &mut BoardState, now: f64, _whole_beat: i64) {
                                 if x == state.cat_x as usize && y == state.cat_y as usize {
                                     continue;
                                 }
-                                if state.grid[idx].is_none() && !matches!(lvl.tile(x as u8, y as u8).obstacle, Some(ObstacleKind::Block)) {
+                                if state.grid[idx].is_none()
+                                    && !matches!(
+                                        lvl.tile(x as u8, y as u8).obstacle,
+                                        Some(ObstacleKind::Block)
+                                    )
+                                {
                                     let parity = (x + y) % 2;
                                     state.grid[idx] = Some(if parity == 0 { pat0 } else { pat1 });
                                 }
@@ -903,11 +932,18 @@ fn render_board(state: &mut BoardState, now: f64) {
         (bg + 12).clamp(0, 255)
     );
     state.ctx.set_fill_style_str(&color);
-    state.ctx.fill_rect(0.0, 0.0, state.canvas.width() as f64, state.canvas.height() as f64);
+    state.ctx.fill_rect(
+        0.0,
+        0.0,
+        state.canvas.width() as f64,
+        state.canvas.height() as f64,
+    );
 
     // Top accent band (spawn row visual)
     state.ctx.set_fill_style_str("rgba(255,220,120,0.08)");
-    state.ctx.fill_rect(0.0, 0.0, state.canvas.width() as f64, cell_h);
+    state
+        .ctx
+        .fill_rect(0.0, 0.0, state.canvas.width() as f64, cell_h);
 
     // Highlight goal region tiles
     state.ctx.set_fill_style_str("rgba(120,200,255,0.10)");
@@ -936,7 +972,9 @@ fn render_board(state: &mut BoardState, now: f64) {
             let py = hy as f64 * cell_h;
             state.ctx.set_stroke_style_str("rgba(255,240,150,0.55)");
             state.ctx.set_line_width(3.0);
-            state.ctx.stroke_rect(px + 1.5, py + 1.5, cell_w - 3.0, cell_h - 3.0);
+            state
+                .ctx
+                .stroke_rect(px + 1.5, py + 1.5, cell_w - 3.0, cell_h - 3.0);
         }
     }
 
@@ -1004,9 +1042,15 @@ fn render_board(state: &mut BoardState, now: f64) {
         let iy = from_y + (to_y - from_y) * ease_t;
         // vertical arc for hop
         let hop_h = (t * std::f64::consts::PI).sin() * 0.20 * cell_h;
-        (ix * cell_w + cell_w / 2.0, iy * cell_h + cell_h / 2.0 - hop_h)
+        (
+            ix * cell_w + cell_w / 2.0,
+            iy * cell_h + cell_h / 2.0 - hop_h,
+        )
     } else {
-        (state.cat_x as f64 * cell_w + cell_w / 2.0, state.cat_y as f64 * cell_h + cell_h / 2.0)
+        (
+            state.cat_x as f64 * cell_w + cell_w / 2.0,
+            state.cat_y as f64 * cell_h + cell_h / 2.0,
+        )
     };
 
     // Position the DOM cat SVG (#hc-cat) over the canvas at the computed tile center.
@@ -1055,7 +1099,9 @@ fn render_board(state: &mut BoardState, now: f64) {
         let right = px + cell_w - inset;
         let bottom = py + cell_h - inset;
         state.ctx.set_line_width(4.0);
-        state.ctx.set_stroke_style_str(&format!("rgba(255,80,80,{alpha})"));
+        state
+            .ctx
+            .set_stroke_style_str(&format!("rgba(255,80,80,{alpha})"));
         for i in 0..3 {
             let offset = i as f64 * 6.0;
             state.ctx.begin_path();
@@ -1068,7 +1114,12 @@ fn render_board(state: &mut BoardState, now: f64) {
     // GAME OVER overlay (unchanged)
     if state.game_over {
         state.ctx.set_fill_style_str("rgba(0,0,0,0.55)");
-        state.ctx.fill_rect(0.0, 0.0, state.canvas.width() as f64, state.canvas.height() as f64);
+        state.ctx.fill_rect(
+            0.0,
+            0.0,
+            state.canvas.width() as f64,
+            state.canvas.height() as f64,
+        );
         state.ctx.set_fill_style_str("#ffffff");
         state.ctx.set_font("72px 'Noto Serif SC', serif");
         state.ctx.set_text_align("center");
@@ -1079,7 +1130,10 @@ fn render_board(state: &mut BoardState, now: f64) {
         state.ctx.stroke_text("GAME OVER", cx, cy).ok();
         state.ctx.fill_text("GAME OVER", cx, cy).ok();
         state.ctx.set_font("20px 'Fira Code', monospace");
-        state.ctx.fill_text("Refresh to try again", cx, cy + 44.0).ok();
+        state
+            .ctx
+            .fill_text("Refresh to try again", cx, cy + 44.0)
+            .ok();
     }
 }
 
@@ -1243,7 +1297,8 @@ fn draw_obstacle(
             // strength number in corner
             ctx.set_fill_style_str("#ffffff");
             ctx.set_font("12px 'Fira Code', monospace");
-            ctx.fill_text(&format!("{}", strength), px + cw - 14.0, py + ch - 8.0).ok();
+            ctx.fill_text(&format!("{}", strength), px + cw - 14.0, py + ch - 8.0)
+                .ok();
         }
         ObstacleKind::Transform => {
             // Transform tile: gradient-like base + double arrow
@@ -1329,10 +1384,17 @@ fn apply_tile_effects(piece: &mut Piece, state: &mut BoardState, current_beat: i
                 for _ in 0..*strength {
                     let nx = tx + ldx;
                     let ny = ty + ldy;
-                    if nx < 0 || ny < 0 || (nx as u8) >= state.level.width || (ny as u8) >= state.level.height {
+                    if nx < 0
+                        || ny < 0
+                        || (nx as u8) >= state.level.width
+                        || (ny as u8) >= state.level.height
+                    {
                         break;
                     }
-                    if matches!(state.level.tile(nx as u8, ny as u8).obstacle, Some(ObstacleKind::Block)) {
+                    if matches!(
+                        state.level.tile(nx as u8, ny as u8).obstacle,
+                        Some(ObstacleKind::Block)
+                    ) {
                         break;
                     }
                     tx = nx;
@@ -1448,14 +1510,22 @@ fn set_level(state: &mut BoardState, new_index: usize, now: f64, _current_beat: 
         let mut neighbors: Vec<usize> = Vec::new();
         for dy in -1..=1 {
             for dx in -1..=1 {
-                if dx == 0 && dy == 0 { continue; }
+                if dx == 0 && dy == 0 {
+                    continue;
+                }
                 let nx = cx + dx;
                 let ny = cy + dy;
-                if nx < 0 || ny < 0 { continue; }
+                if nx < 0 || ny < 0 {
+                    continue;
+                }
                 let nxu = nx as u8;
                 let nyu = ny as u8;
-                if nxu >= lvl.width || nyu >= lvl.height { continue; }
-                if matches!(lvl.tile(nxu, nyu).obstacle, Some(ObstacleKind::Block)) { continue; }
+                if nxu >= lvl.width || nyu >= lvl.height {
+                    continue;
+                }
+                if matches!(lvl.tile(nxu, nyu).obstacle, Some(ObstacleKind::Block)) {
+                    continue;
+                }
                 neighbors.push(ny as usize * w + nx as usize);
             }
         }
@@ -1494,7 +1564,7 @@ fn set_level(state: &mut BoardState, new_index: usize, now: f64, _current_beat: 
                 let (pat0, pat1) = if selected.len() >= neighbors.len() + 2 {
                     (selected[neighbors.len()], selected[neighbors.len() + 1])
                 } else {
-                    (crate::SINGLE_HANZI[0], crate::SINGLE_HANZI[(1 % pool_len)])
+                    (crate::SINGLE_HANZI[0], crate::SINGLE_HANZI[1 % pool_len])
                 };
 
                 for y in 0..h {
@@ -1504,7 +1574,12 @@ fn set_level(state: &mut BoardState, new_index: usize, now: f64, _current_beat: 
                         if x == state.cat_x as usize && y == state.cat_y as usize {
                             continue;
                         }
-                        if state.grid[idx].is_none() && !matches!(lvl.tile(x as u8, y as u8).obstacle, Some(ObstacleKind::Block)) {
+                        if state.grid[idx].is_none()
+                            && !matches!(
+                                lvl.tile(x as u8, y as u8).obstacle,
+                                Some(ObstacleKind::Block)
+                            )
+                        {
                             let parity = (x + y) % 2;
                             state.grid[idx] = Some(if parity == 0 { pat0 } else { pat1 });
                         }
@@ -1685,10 +1760,19 @@ mod tests {
         obstacle_positions: &[(u8, u8)],
         goals: &[(u8, u8)],
     ) -> LevelDesc {
-        let mut tiles_vec = vec![TileDesc { obstacle: None, modifier: None }; (width as usize * height as usize)];
+        let mut tiles_vec = vec![
+            TileDesc {
+                obstacle: None,
+                modifier: None
+            };
+            (width as usize * height as usize)
+        ];
         for &(ox, oy) in obstacle_positions.iter() {
             let idx = oy as usize * width as usize + ox as usize;
-            tiles_vec[idx] = TileDesc { obstacle: Some(ObstacleKind::Block), modifier: None };
+            tiles_vec[idx] = TileDesc {
+                obstacle: Some(ObstacleKind::Block),
+                modifier: None,
+            };
         }
         let tiles_static: &'static [TileDesc] = Box::leak(tiles_vec.into_boxed_slice());
         let spawn_static: &'static [(u8, u8)] = Box::leak(vec![(0u8, 0u8)].into_boxed_slice());
